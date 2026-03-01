@@ -6,6 +6,7 @@ DEFAULT_INSTALL_DIR="${INDICES_INSTALL_DIR:-$HOME/.local/bin}"
 VERSION_INPUT="${INDICES_INSTALL_VERSION:-}"
 INSTALL_DIR="${DEFAULT_INSTALL_DIR}"
 ASSUME_YES=0
+INSTALL_TMPDIR=""
 
 usage() {
   cat <<'EOF'
@@ -29,6 +30,12 @@ require_cmd() {
   if ! command -v "$1" >/dev/null 2>&1; then
     echo "Missing required command: $1" >&2
     exit 1
+  fi
+}
+
+cleanup_install_tmpdir() {
+  if [[ -n "${INSTALL_TMPDIR:-}" && -d "${INSTALL_TMPDIR}" ]]; then
+    rm -rf "${INSTALL_TMPDIR}"
   fi
 }
 
@@ -173,11 +180,12 @@ install_binary() {
 
 main() {
   parse_args "$@"
+  trap cleanup_install_tmpdir EXIT
 
   require_cmd curl
   require_cmd tar
 
-  local platform tag version asset_name checksums_name base_url tmpdir asset_path checksums_path
+  local platform tag version asset_name checksums_name base_url asset_path checksums_path
   platform="$(pick_platform)"
   tag="$(normalize_version "$VERSION_INPUT")"
 
@@ -190,11 +198,10 @@ main() {
   checksums_name="indices_${version}_checksums.txt"
   base_url="https://github.com/${INDICES_REPO}/releases/download/${tag}"
 
-  tmpdir="$(mktemp -d)"
-  trap 'rm -rf "$tmpdir"' EXIT
+  INSTALL_TMPDIR="$(mktemp -d)"
 
-  asset_path="${tmpdir}/${asset_name}"
-  checksums_path="${tmpdir}/${checksums_name}"
+  asset_path="${INSTALL_TMPDIR}/${asset_name}"
+  checksums_path="${INSTALL_TMPDIR}/${checksums_name}"
 
   echo "Installing indices ${tag} for ${platform} from ${INDICES_REPO}"
 
@@ -203,8 +210,8 @@ main() {
 
   verify_checksum "$asset_path" "$checksums_path"
 
-  tar -xzf "$asset_path" -C "$tmpdir"
-  install_binary "${tmpdir}/indices"
+  tar -xzf "$asset_path" -C "${INSTALL_TMPDIR}"
+  install_binary "${INSTALL_TMPDIR}/indices"
 
   echo "Installed to ${INSTALL_DIR}/indices"
   if [[ ":$PATH:" != *":${INSTALL_DIR}:"* ]]; then
