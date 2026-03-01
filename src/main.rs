@@ -54,7 +54,7 @@ async fn run() -> Result<(), CliError> {
     })?;
 
     let response = match &cli.command {
-        Command::Whoami => commands::auth::whoami(&client).await?,
+        Command::AuthTest => commands::auth::auth_test(&client).await?,
         Command::Tasks { command } => {
             commands::tasks::handle_tasks_command(&client, command).await?
         }

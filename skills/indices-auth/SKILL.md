@@ -9,7 +9,7 @@ description: Use this skill when the user needs to authenticate with the Indices
 
 Use this skill for:
 - `indices login`
-- `indices whoami`
+- `indices auth-test`
 - `indices logout`
 - API key verification and storage behavior
 
@@ -27,10 +27,10 @@ Behavior:
 - API key is validated.
 - Stores API key in local config.
 
-### Whoami
+### Auth Test
 
 ```bash
-indices whoami
+indices auth-test
 ```
 
 Returns an authenticated probe response.
@@ -46,6 +46,6 @@ Removes stored API key.
 ## Useful Global Flags
 
 ```bash
-indices whoami --output json
+indices auth-test --output json
 indices login --api-base https://api.indices.io --timeout 30
 ```

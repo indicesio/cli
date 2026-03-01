@@ -83,7 +83,7 @@ impl ApiClient {
         })
     }
 
-    pub async fn whoami_probe(&self) -> Result<Value, ApiError> {
+    pub async fn auth_test_probe(&self) -> Result<Value, ApiError> {
         let tasks = self
             .inner
             .list_tasks()

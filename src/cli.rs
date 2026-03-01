@@ -25,7 +25,7 @@ pub struct Cli {
 pub enum Command {
     Login(LoginArgs),
     Logout,
-    Whoami,
+    AuthTest,
     Tasks {
         #[command(subcommand)]
         command: TasksCommand,

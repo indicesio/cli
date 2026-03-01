@@ -36,7 +36,7 @@ cargo install --path .
 
 ```bash
 indices login
-indices whoami
+indices auth-test
 indices tasks list
 indices tasks create --display-name "Apply Job" --website "https://example.com" --task "Fill form"
 indices runs create --task-id "<task-uuid>" --arguments '{"job_id":"123"}'

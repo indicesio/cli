@@ -29,7 +29,7 @@ pub async fn login(
         })?;
 
         client
-            .whoami_probe()
+            .auth_test_probe()
             .await
             .map_err(|error| CliError::Message(format!("API key verification failed: {error}")))?;
     }
@@ -56,8 +56,8 @@ pub fn logout(config_store: &mut ConfigStore) -> Result<(), CliError> {
     Ok(())
 }
 
-pub async fn whoami(client: &ApiClient) -> Result<Value, CliError> {
-    let probe = client.whoami_probe().await?;
+pub async fn auth_test(client: &ApiClient) -> Result<Value, CliError> {
+    let probe = client.auth_test_probe().await?;
 
     Ok(json!({
         "authenticated": true,
