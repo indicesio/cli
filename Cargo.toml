@@ -2,6 +2,9 @@
 name = "indices-cli"
 version = "0.0.2"
 edition = "2024"
+license = "MIT"
+homepage = "https://indices.io"
+repository = "https://github.com/indicesio/cli"
 
 [[bin]]
 name = "indices"
