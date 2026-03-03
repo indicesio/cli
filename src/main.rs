@@ -21,6 +21,12 @@ async fn main() {
 }
 
 async fn run() -> Result<(), CliError> {
+    let argv: Vec<String> = std::env::args().collect();
+    if argv.len() == 2 && argv[1] == "--version" {
+        println!("Indices CLI v{}", env!("CARGO_PKG_VERSION"));
+        return Ok(());
+    }
+
     let cli = Cli::parse();
 
     let mut config_store = ConfigStore::load()?;
