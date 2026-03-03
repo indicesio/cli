@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
-use clap::builder::styling::{AnsiColor, Effects};
 use clap::builder::Styles;
+use clap::builder::styling::{AnsiColor, Effects};
 use clap::{Args, Parser, Subcommand};
 
 use crate::config::OutputMode;

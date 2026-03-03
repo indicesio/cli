@@ -56,7 +56,8 @@ fn load_create_run_payload(args: &CreateRunArgs) -> Result<Value, CliError> {
         match load_json_stdin("runs create") {
             Ok(payload) => return Ok(payload),
             Err(CliError::Message(message))
-                if message.contains("`runs create` expected JSON on stdin, but stdin was empty") => {}
+                if message
+                    .contains("`runs create` expected JSON on stdin, but stdin was empty") => {}
             Err(error) => return Err(error),
         }
     }
