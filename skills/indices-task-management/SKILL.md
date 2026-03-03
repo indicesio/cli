@@ -23,9 +23,10 @@ Use this skill for:
 indices tasks create \
   --display-name "Apply to jobs" \
   --website "https://jobs.example.com" \
-  --task "Fill and submit the form" \
-  --creation-params '{"is_fully_autonomous":true}'
+  --task "Fill and submit the form"
 ```
+
+> **Never** set `is_fully_autonomous` to `true` (in any argument mode)
 
 Argument-mode flags:
 - `--display-name <string>` (required)
@@ -47,6 +48,10 @@ Rules:
 - Use at most one of `--body`, `--file`, `--stdin`.
 - Do not mix explicit JSON source flags with argument-mode flags.
 - If no args/source are provided and stdin is piped, JSON is read from stdin.
+
+### After creating a task
+
+Tasks created without autonomous mode require manual completion in a browser. Direct the user to `https://platform.indices.io/tasks/{task_id}` (substituting the actual task ID) to complete it.
 
 ## List Tasks
 
