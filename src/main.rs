@@ -14,9 +14,17 @@ use crate::errors::CliError;
 
 #[tokio::main]
 async fn main() {
-    if let Err(error) = run().await {
-        eprintln!("{error}");
-        std::process::exit(error.exit_code());
+    match run().await {
+        Ok(()) => {}
+        Err(CliError::Clap(error)) => {
+            let code = error.exit_code();
+            let _ = error.print();
+            std::process::exit(code);
+        }
+        Err(error) => {
+            eprintln!("{error}");
+            std::process::exit(error.exit_code());
+        }
     }
 }
 

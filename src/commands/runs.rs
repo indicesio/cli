@@ -1,6 +1,8 @@
 use serde_json::{Map, Value};
 
-use crate::cli::{CreateRunArgs, RunIdArgs, RunsCommand};
+use clap::{CommandFactory, error::ErrorKind};
+
+use crate::cli::{Cli, CreateRunArgs, RunIdArgs, RunsCommand};
 use crate::client::ApiClient;
 use crate::commands::payload::{
     ExplicitJsonSource, load_explicit_json_payload, load_json_stdin, parse_json_object_arg,
@@ -51,12 +53,27 @@ fn load_create_run_payload(args: &CreateRunArgs) -> Result<Value, CliError> {
     }
 
     if stdin_has_data() {
-        return load_json_stdin("runs create");
+        match load_json_stdin("runs create") {
+            Ok(payload) => return Ok(payload),
+            Err(CliError::Message(message))
+                if message.contains("`runs create` expected JSON on stdin, but stdin was empty") => {}
+            Err(error) => return Err(error),
+        }
     }
 
-    Err(CliError::Message(
-        "provide run arguments (`--task-id`) or one of `--body`, `--file`, `--stdin`".to_string(),
-    ))
+    Err(render_runs_create_help_error().into())
+}
+
+fn render_runs_create_help_error() -> clap::Error {
+    let mut command = Cli::command();
+
+    match command.try_get_matches_from_mut(["indices", "runs", "create", "--help"]) {
+        Err(error) if error.kind() == ErrorKind::DisplayHelp => error,
+        _ => command.error(
+            ErrorKind::DisplayHelp,
+            "Run `indices runs create --help` for usage.",
+        ),
+    }
 }
 
 fn has_run_argument_values(args: &CreateRunArgs) -> bool {

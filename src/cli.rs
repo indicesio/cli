@@ -6,22 +6,16 @@ use clap::{Args, Parser, Subcommand};
 
 use crate::config::OutputMode;
 
-const RUNS_CREATE_LONG_ABOUT: &str = "\
-Create a run for a task.
+const RUNS_CREATE_AFTER_HELP: &str = "\
+\x1b[1;97mModes:\x1b[0m
 
-This command supports two input modes:
+Parameters can be supplied in one of three different ways:
 
-1. Argument mode:
-   Provide `--task-id` and optionally `--arguments` and `--secret-bindings`.
+  Command args: pass `--task-id` and optionally `--arguments` / `--secret-bindings`
+  Raw JSON as parameter: pass one of `--body`, `--file`, `--stdin` (do not mix with argument mode)
+  Piped JSON: if no mode flags are provided and stdin has data, JSON is read from stdin
 
-2. Explicit JSON mode:
-   Provide a full run payload with `--body`, `--file`, or `--stdin`.
-   Do not combine explicit JSON flags with argument mode flags.
-
-If no mode flags are provided and stdin has data, the payload is read from stdin.";
-
-const RUNS_CREATE_EXAMPLES: &str = "\
-Examples:
+\x1b[1;97mExamples:\x1b[0m
   indices runs create --task-id 11111111-1111-1111-1111-111111111111
   indices runs create --task-id 11111111-1111-1111-1111-111111111111 --arguments '{\"job_id\":\"A1\"}'
   indices runs create --task-id 11111111-1111-1111-1111-111111111111 --arguments '{\"job_id\":\"A1\"}' --secret-bindings '{\"GOOGLE_LOGIN\":\"22222222-2222-2222-2222-222222222222\"}'
@@ -197,8 +191,8 @@ pub struct ListTasksArgs {
 pub enum RunsCommand {
     #[command(
         about = "Create a run for a task",
-        long_about = RUNS_CREATE_LONG_ABOUT,
-        after_long_help = RUNS_CREATE_EXAMPLES
+        long_about = None,
+        after_help = RUNS_CREATE_AFTER_HELP
     )]
     Create(CreateRunArgs),
     #[command(about = "List runs for a task")]
