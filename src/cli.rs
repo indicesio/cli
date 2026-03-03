@@ -1,20 +1,68 @@
 use std::path::PathBuf;
 
+use clap::builder::styling::{AnsiColor, Effects};
+use clap::builder::Styles;
 use clap::{Args, Parser, Subcommand};
 
 use crate::config::OutputMode;
 
+const RUNS_CREATE_LONG_ABOUT: &str = "\
+Create a run for a task.
+
+This command supports two input modes:
+
+1. Argument mode:
+   Provide `--task-id` and optionally `--arguments` and `--secret-bindings`.
+
+2. Explicit JSON mode:
+   Provide a full run payload with `--body`, `--file`, or `--stdin`.
+   Do not combine explicit JSON flags with argument mode flags.
+
+If no mode flags are provided and stdin has data, the payload is read from stdin.";
+
+const RUNS_CREATE_EXAMPLES: &str = "\
+Examples:
+  indices runs create --task-id 11111111-1111-1111-1111-111111111111
+  indices runs create --task-id 11111111-1111-1111-1111-111111111111 --arguments '{\"job_id\":\"A1\"}'
+  indices runs create --task-id 11111111-1111-1111-1111-111111111111 --arguments '{\"job_id\":\"A1\"}' --secret-bindings '{\"GOOGLE_LOGIN\":\"22222222-2222-2222-2222-222222222222\"}'
+  indices runs create --file run-payload.json
+  cat run-payload.json | indices runs create";
+
+fn cli_styles() -> Styles {
+    Styles::styled()
+        .header(AnsiColor::BrightWhite.on_default().effects(Effects::BOLD))
+        .usage(AnsiColor::BrightWhite.on_default().effects(Effects::BOLD))
+        .literal(AnsiColor::BrightCyan.on_default())
+        .placeholder(AnsiColor::BrightYellow.on_default())
+}
+
 #[derive(Debug, Parser)]
 #[command(name = "indices")]
-#[command(about = "Indices API CLI", long_about = None)]
+#[command(about = "Indices API CLI", long_about = None, styles = cli_styles())]
 pub struct Cli {
-    #[arg(long, global = true, value_enum)]
+    #[arg(
+        long,
+        global = true,
+        value_enum,
+        help = "Output format",
+        help_heading = "Global Options"
+    )]
     pub output: Option<OutputMode>,
 
-    #[arg(long, global = true)]
+    #[arg(
+        long,
+        global = true,
+        help = "Override API base URL",
+        help_heading = "Global Options"
+    )]
     pub api_base: Option<String>,
 
-    #[arg(long, global = true)]
+    #[arg(
+        long,
+        global = true,
+        help = "HTTP timeout in seconds",
+        help_heading = "Global Options"
+    )]
     pub timeout: Option<u64>,
 
     #[command(subcommand)]
@@ -23,17 +71,23 @@ pub struct Cli {
 
 #[derive(Debug, Subcommand)]
 pub enum Command {
+    #[command(about = "Authenticate and store API credentials")]
     Login(LoginArgs),
+    #[command(about = "Remove stored API credentials")]
     Logout,
+    #[command(about = "Verify current authentication")]
     AuthTest,
+    #[command(about = "Manage tasks")]
     Tasks {
         #[command(subcommand)]
         command: TasksCommand,
     },
+    #[command(about = "Run tasks and inspect previous runs")]
     Runs {
         #[command(subcommand)]
         command: RunsCommand,
     },
+    #[command(about = "Manage secrets")]
     Secrets {
         #[command(subcommand)]
         command: SecretsCommand,
@@ -51,23 +105,42 @@ pub struct LoginArgs {
 
 #[derive(Debug, Subcommand)]
 pub enum TasksCommand {
+    #[command(about = "Create a task")]
     Create(CreateTaskArgs),
+    #[command(about = "Get a task by ID")]
     Get(TaskIdArgs),
+    #[command(about = "List tasks")]
     List(ListTasksArgs),
+    #[command(about = "Delete a task")]
     Delete(DeleteTaskArgs),
+    #[command(about = "Retry a task")]
     Retry(TaskIdArgs),
+    #[command(about = "Regenerate connector logic for a task")]
     RegenerateApi(TaskIdArgs),
 }
 
 #[derive(Debug, Args)]
 pub struct CreatePayloadSourceArgs {
-    #[arg(long, help = "Raw JSON payload")]
+    #[arg(
+        long,
+        help = "Raw JSON payload string",
+        help_heading = "Payload Sources"
+    )]
     pub body: Option<String>,
 
-    #[arg(long, help = "Path to JSON payload file")]
+    #[arg(
+        long,
+        help = "Path to a JSON payload file",
+        help_heading = "Payload Sources"
+    )]
     pub file: Option<PathBuf>,
 
-    #[arg(long, default_value_t = false, help = "Read JSON payload from stdin")]
+    #[arg(
+        long,
+        default_value_t = false,
+        help = "Read JSON payload from stdin",
+        help_heading = "Payload Sources"
+    )]
     pub stdin: bool,
 }
 
@@ -122,8 +195,15 @@ pub struct ListTasksArgs {
 
 #[derive(Debug, Subcommand)]
 pub enum RunsCommand {
+    #[command(
+        about = "Create a run for a task",
+        long_about = RUNS_CREATE_LONG_ABOUT,
+        after_long_help = RUNS_CREATE_EXAMPLES
+    )]
     Create(CreateRunArgs),
+    #[command(about = "List runs for a task")]
     List(ListRunsArgs),
+    #[command(about = "Get a run by ID")]
     Get(RunIdArgs),
 }
 
@@ -132,13 +212,28 @@ pub struct CreateRunArgs {
     #[command(flatten)]
     pub payload: CreatePayloadSourceArgs,
 
-    #[arg(long, help = "Task UUID to execute")]
+    #[arg(
+        long,
+        value_name = "TASK_ID",
+        help = "Task UUID to execute (required in argument mode)",
+        help_heading = "Argument Mode"
+    )]
     pub task_id: Option<String>,
 
-    #[arg(long, help = "JSON object for run arguments")]
+    #[arg(
+        long,
+        value_name = "JSON",
+        help = "JSON object for run arguments",
+        help_heading = "Argument Mode"
+    )]
     pub arguments: Option<String>,
 
-    #[arg(long, help = "JSON object mapping secret slots to UUIDs")]
+    #[arg(
+        long,
+        value_name = "JSON",
+        help = "JSON object mapping secret slots to secret UUIDs",
+        help_heading = "Argument Mode"
+    )]
     pub secret_bindings: Option<String>,
 }
 
