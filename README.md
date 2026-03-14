@@ -46,7 +46,7 @@ indices secrets list
 indices secrets delete <secret-uuid>
 ```
 
-Use `--output markdown|json` on any command.
+Commands render Markdown by default. Use `--json` on any command for JSON output.
 
 Create methods support:
 - Argument mode by default (for example, `--task-id`, `--display-name`, `--website`, `--task`)

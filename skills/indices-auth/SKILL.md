@@ -46,6 +46,6 @@ Removes stored API key.
 ## Useful Global Flags
 
 ```bash
-indices auth-test --output json
+indices --json auth-test
 indices login --api-base https://api.indices.io --timeout 30
 ```

@@ -4,8 +4,6 @@ use clap::builder::Styles;
 use clap::builder::styling::{AnsiColor, Effects};
 use clap::{Args, Parser, Subcommand};
 
-use crate::config::OutputMode;
-
 const TASKS_CREATE_AFTER_HELP: &str = "\
 \x1b[1;97mModes:\x1b[0m
 Parameters can be supplied in one of three different ways:
@@ -60,11 +58,11 @@ pub struct Cli {
     #[arg(
         long,
         global = true,
-        value_enum,
-        help = "Output format",
+        default_value_t = false,
+        help = "Emit JSON instead of markdown",
         help_heading = "Global Options"
     )]
-    pub output: Option<OutputMode>,
+    pub json: bool,
 
     #[arg(
         long,
@@ -308,4 +306,19 @@ pub struct DeleteSecretArgs {
 
     #[arg(long, default_value_t = false)]
     pub yes: bool,
+}
+
+#[cfg(test)]
+mod tests {
+    use clap::Parser;
+
+    use super::{Cli, Command};
+
+    #[test]
+    fn parses_json_flag_as_global_option() {
+        let cli = Cli::parse_from(["indices", "--json", "tasks", "list"]);
+
+        assert!(cli.json);
+        assert!(matches!(cli.command, Command::Tasks { .. }));
+    }
 }

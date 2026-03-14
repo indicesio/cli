@@ -8,7 +8,7 @@ description: Use this skill for any operation with the Indices CLI — authentic
 ## Global Flags
 
 Available on every command:
-- `--output markdown|json` (default: `markdown`) — use `json` for scripting
+- Markdown output by default; use `--json` for scripting
 - `--api-base <url>` (default: `https://api.indices.io`)
 - `--timeout <seconds>` (default: `30`)
 

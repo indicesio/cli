@@ -9,7 +9,7 @@ use clap::Parser;
 
 use crate::cli::{Cli, Command};
 use crate::client::{ApiClient, ClientOptions};
-use crate::config::{ConfigStore, RuntimeOverrides};
+use crate::config::{ConfigStore, OutputMode, RuntimeOverrides};
 use crate::errors::CliError;
 
 #[tokio::main]
@@ -42,7 +42,6 @@ async fn run() -> Result<(), CliError> {
     let overrides = RuntimeOverrides {
         api_base: cli.api_base.as_deref(),
         timeout_seconds: cli.timeout,
-        output: cli.output,
     };
 
     match &cli.command {
@@ -81,6 +80,11 @@ async fn run() -> Result<(), CliError> {
         }
     };
 
-    output::print_response(&response, runtime.output)?;
+    let output_mode = if cli.json {
+        OutputMode::Json
+    } else {
+        OutputMode::Markdown
+    };
+    output::print_response(&response, output_mode)?;
     Ok(())
 }

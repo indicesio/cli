@@ -18,7 +18,7 @@ Use this skill for:
 Use tasks commands to locate task IDs:
 
 ```bash
-indices tasks list --output json
+indices --json tasks list
 indices tasks get <task-uuid>
 ```
 

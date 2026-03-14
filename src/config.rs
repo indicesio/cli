@@ -11,7 +11,7 @@ pub const DEFAULT_API_BASE: &str = "https://api.indices.io";
 const DEFAULT_TIMEOUT_SECONDS: u64 = 30;
 const CONFIG_FILE_NAME: &str = "config.toml";
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default, clap::ValueEnum)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum OutputMode {
     #[default]
@@ -23,7 +23,6 @@ pub enum OutputMode {
 pub struct ConfigFile {
     pub api_base: Option<String>,
     pub api_key: Option<String>,
-    pub output: Option<OutputMode>,
     pub timeout_seconds: Option<u64>,
 }
 
@@ -32,7 +31,6 @@ impl Default for ConfigFile {
         Self {
             api_base: Some(DEFAULT_API_BASE.to_string()),
             api_key: None,
-            output: Some(OutputMode::Markdown),
             timeout_seconds: Some(DEFAULT_TIMEOUT_SECONDS),
         }
     }
@@ -60,14 +58,12 @@ pub struct RuntimeConfig {
     pub api_base: String,
     pub api_key: Option<String>,
     pub timeout_seconds: u64,
-    pub output: OutputMode,
 }
 
 #[derive(Debug, Clone, Copy)]
 pub struct RuntimeOverrides<'a> {
     pub api_base: Option<&'a str>,
     pub timeout_seconds: Option<u64>,
-    pub output: Option<OutputMode>,
 }
 
 #[derive(Debug)]
@@ -118,15 +114,10 @@ impl ConfigStore {
             .or(self.data.timeout_seconds)
             .unwrap_or(DEFAULT_TIMEOUT_SECONDS);
 
-        let output = overrides
-            .output
-            .unwrap_or(self.data.output.unwrap_or(OutputMode::Markdown));
-
         Ok(RuntimeConfig {
             api_base,
             api_key: self.data.api_key.clone(),
             timeout_seconds,
-            output,
         })
     }
 
@@ -239,7 +230,7 @@ mod tests {
     }
 
     #[test]
-    fn json_override_wins_runtime_output() {
+    fn runtime_defaults_do_not_depend_on_output_config() {
         let config = ConfigFile::default();
         let store = ConfigStore {
             path: PathBuf::from("/tmp/indices/config.toml"),
@@ -250,10 +241,10 @@ mod tests {
             .resolve_runtime(&RuntimeOverrides {
                 api_base: None,
                 timeout_seconds: None,
-                output: Some(OutputMode::Json),
             })
             .expect("runtime should resolve");
 
-        assert_eq!(runtime.output, OutputMode::Json);
+        assert_eq!(runtime.api_base, DEFAULT_API_BASE);
+        assert_eq!(runtime.timeout_seconds, DEFAULT_TIMEOUT_SECONDS);
     }
 }

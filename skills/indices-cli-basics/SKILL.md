@@ -9,7 +9,7 @@ description: Use this skill for foundational Indices CLI usage: installation, gl
 
 Use this skill when a request is about:
 - Installing or invoking `indices`
-- Choosing `--output markdown|json`
+- Choosing between default Markdown output and `--json`
 - Understanding global flags (`--api-base`, `--timeout`)
 - Understanding create-command input precedence (`--body`, `--file`, `--stdin`, args, piped stdin)
 - Config path and environment overrides
@@ -24,7 +24,7 @@ indices --help
 ## Global Flags
 
 Available on all commands:
-- `--output markdown|json` (default: `markdown`)
+- `--json` to emit JSON instead of the default Markdown output
 - `--api-base <url>` (default: `https://api.indices.io`)
 - `--timeout <seconds>` (default: `30`)
 
