@@ -13,6 +13,8 @@ const PRIORITY_KEYS: &[&str] = &[
     "current_state",
     "status",
     "success",
+    "stdout",
+    "stderr",
     "created_at",
     "finished_at",
     "updated_at",

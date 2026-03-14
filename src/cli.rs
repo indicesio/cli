@@ -233,6 +233,8 @@ pub enum RunsCommand {
     List(ListRunsArgs),
     #[command(about = "Get a run by ID")]
     Get(RunIdArgs),
+    #[command(about = "Get logs for a run")]
+    Logs(RunIdArgs),
 }
 
 #[derive(Debug, Args)]
@@ -312,7 +314,7 @@ pub struct DeleteSecretArgs {
 mod tests {
     use clap::Parser;
 
-    use super::{Cli, Command};
+    use super::{Cli, Command, RunIdArgs, RunsCommand};
 
     #[test]
     fn parses_json_flag_as_global_option() {
@@ -320,5 +322,22 @@ mod tests {
 
         assert!(cli.json);
         assert!(matches!(cli.command, Command::Tasks { .. }));
+    }
+
+    #[test]
+    fn parses_runs_logs_command() {
+        let cli = Cli::parse_from([
+            "indices",
+            "runs",
+            "logs",
+            "11111111-1111-1111-1111-111111111111",
+        ]);
+
+        assert!(matches!(
+            cli.command,
+            Command::Runs {
+                command: RunsCommand::Logs(RunIdArgs { ref run_id })
+            } if run_id == "11111111-1111-1111-1111-111111111111"
+        ));
     }
 }

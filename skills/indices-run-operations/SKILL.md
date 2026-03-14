@@ -12,6 +12,7 @@ Use this skill for:
 - `indices runs create`
 - `indices runs list`
 - `indices runs get`
+- `indices runs logs`
 
 ## Find A Task To Run
 
@@ -66,4 +67,10 @@ Notes:
 
 ```bash
 indices runs get <run-uuid>
+```
+
+## Get Run Logs
+
+```bash
+indices runs logs <run-uuid>
 ```

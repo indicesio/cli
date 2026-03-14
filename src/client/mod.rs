@@ -257,6 +257,18 @@ impl ApiClient {
         to_json_value(response)
     }
 
+    pub async fn get_run_logs(&self, run_id: &str) -> Result<Value, ApiError> {
+        let run_id = parse_uuid(run_id, "run_id")?;
+        let response = self
+            .inner
+            .get_run_logs(&run_id)
+            .await
+            .map_err(map_generated_error)?
+            .into_inner();
+
+        to_json_value(response)
+    }
+
     pub async fn create_secret(&self, name: &str, value: &str) -> Result<Value, ApiError> {
         let request = generated::types::CreateSecretRequest {
             name: name.to_string(),

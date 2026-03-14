@@ -41,6 +41,8 @@ indices tasks list
 indices tasks create --display-name "Apply Job" --website "https://example.com" --task "Fill form"
 indices runs create --task-id "<task-uuid>" --arguments '{"job_id":"123"}'
 indices runs list --task-id <task-uuid>
+indices runs get <run-uuid>
+indices runs logs <run-uuid>
 indices secrets create OPENAI_API_KEY --value "sk-..."
 indices secrets list
 indices secrets delete <secret-uuid>

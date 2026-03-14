@@ -21,6 +21,9 @@ pub async fn handle_runs_command(
             .await
             .map_err(Into::into),
         RunsCommand::Get(RunIdArgs { run_id }) => client.get_run(run_id).await.map_err(Into::into),
+        RunsCommand::Logs(RunIdArgs { run_id }) => {
+            client.get_run_logs(run_id).await.map_err(Into::into)
+        }
     }
 }
 

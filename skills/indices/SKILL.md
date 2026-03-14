@@ -83,12 +83,13 @@ Flags: `--task-id` (required), `--arguments <json-object>`, `--secret-bindings <
 
 JSON input follows the same rules as tasks create.
 
-### List / Get
+### List / Get / Logs
 
 ```bash
 indices runs list --task-id <task-uuid>        # --task-id required
 indices runs list --task-id <task-uuid> --limit 20
 indices runs get <run-uuid>
+indices runs logs <run-uuid>
 ```
 
 ---
