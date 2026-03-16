@@ -12,6 +12,12 @@ Available on every command:
 - `--api-base <url>` (default: `https://api.indices.io`)
 - `--timeout <seconds>` (default: `30`)
 
+Never use `--output json`; this CLI uses the global `--json` flag instead.
+
+When exact flags matter, verify them with `indices <command> --help`.
+
+If the CLI reports `failed to serialize or parse response` or a missing response field, stop and treat that as CLI/API version drift. Check `indices --version` and `which indices`; in the CLI repo, prefer `cargo run -- ...` or reinstall with `cargo install --path .` before continuing.
+
 ---
 
 ## Auth
@@ -38,7 +44,15 @@ indices tasks create \
 
 > **Never** set `is_fully_autonomous` to `true`.
 
-After creation, the task requires manual completion in a browser. Direct the user to `https://platform.indices.io/tasks/{task_id}` (substituting the actual task ID).
+Prefer the simple form above. Do not pass `--creation-params` unless needed.
+
+If you set `creation_params.auto_generate_schemas` to `false`, you must also provide both `input_schema` and `output_schema` or the API returns `422`.
+
+After creation, inspect `current_state`:
+- `waiting_for_manual_completion`: direct the user to `https://platform.indices.io/tasks/{task_id}`
+- `not_ready`: poll with `indices tasks get <task-uuid>`
+- `ready`: the task can be executed
+- `failed`: inspect failure details before retrying or recreating
 
 Flags: `--display-name` (required), `--website` (required), `--task` (required), `--input-schema`, `--output-schema`, `--creation-params <json-object>`
 
@@ -56,6 +70,7 @@ Rules: use at most one of `--body`, `--file`, `--stdin`; do not mix with argumen
 
 ```bash
 indices tasks list
+indices --json tasks list
 indices tasks list --status ready --limit 20   # statuses: not_ready | waiting_for_manual_completion | ready | failed
 indices tasks get <task-uuid>
 indices tasks retry <task-uuid>
@@ -63,8 +78,6 @@ indices tasks regenerate-api <task-uuid>
 indices tasks delete <task-uuid>               # prompts for confirmation
 indices tasks delete <task-uuid> --yes
 ```
-
-Note: `--cursor` is unsupported and returns an error.
 
 ---
 

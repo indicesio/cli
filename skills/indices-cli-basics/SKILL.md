@@ -21,12 +21,20 @@ cargo install --path .
 indices --help
 ```
 
+If you are inside the `indices-cli` repo and command behavior matters, prefer the checked-out code over a stale installed binary:
+
+```bash
+cargo run -- --help
+```
+
 ## Global Flags
 
 Available on all commands:
 - `--json` to emit JSON instead of the default Markdown output
 - `--api-base <url>` (default: `https://api.indices.io`)
 - `--timeout <seconds>` (default: `30`)
+
+Never use `--output json`; this CLI does not support it.
 
 ## Output Modes
 
@@ -48,3 +56,21 @@ For `tasks create` and `runs create`, precedence is:
 
 Rules:
 - Do not mix `--body/--file/--stdin` with create argument flags.
+
+## Command And Version Sanity Checks
+
+When a command's exact flags matter, verify them from the CLI:
+
+```bash
+indices tasks list --help
+indices tasks create --help
+indices runs create --help
+```
+
+If the CLI returns `failed to serialize or parse response` or a missing-field error, treat that as CLI/API schema drift, not as a normal task/runs failure.
+
+In that case:
+- Check `indices --version`
+- Check `which indices`
+- If you are working in the CLI repo, prefer `cargo run -- ...` or reinstall with `cargo install --path .`
+- Do not continue creating, deleting, or running resources until the mismatch is resolved

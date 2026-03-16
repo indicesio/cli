@@ -20,8 +20,12 @@ Use tasks commands to locate task IDs:
 
 ```bash
 indices --json tasks list
-indices tasks get <task-uuid>
+indices --json tasks get <task-uuid>
 ```
+
+Rules:
+- Use `--json`, not `--output json`
+- If task listing or retrieval fails with a response parse error, resolve the CLI/API mismatch first; do not guess task IDs or create replacement tasks blindly
 
 ## Create Run
 
@@ -61,7 +65,15 @@ indices runs list --task-id <task-uuid> --limit 20
 
 Notes:
 - `--task-id` is required.
-- `--cursor` is currently unsupported and returns an error.
+- `--json` is a global flag; do not use `--output json`.
+
+## Failure Handling
+
+If `runs list`, `runs get`, or `runs create` returns `failed to serialize or parse response` or reports a missing response field:
+- Stop and treat it as CLI/API version drift
+- Run `indices --version` and `which indices`
+- If you are in the CLI repo, retry with `cargo run -- ...` or reinstall with `cargo install --path .`
+- Do not continue executing runs until the mismatch is resolved
 
 ## Get Run
 
