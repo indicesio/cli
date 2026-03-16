@@ -4,6 +4,7 @@ use std::str::FromStr;
 use std::time::Duration;
 
 use reqwest::header::{AUTHORIZATION, HeaderMap, HeaderValue};
+use reqwest::StatusCode;
 use serde::Serialize;
 use serde_json::{Value, json};
 use thiserror::Error;
@@ -235,14 +236,33 @@ impl ApiClient {
             |error| ApiError::InvalidArgument(format!("invalid create-run payload: {error}")),
         )?;
 
+        // Handle runs.create manually so undocumented 4xx responses and schema-drift
+        // in error payloads still surface the backend's actual message.
         let response = self
             .inner
-            .create_run(&request)
-            .await
-            .map_err(map_generated_error)?
-            .into_inner();
+            .client
+            .post(format!("{}/v1beta/runs", self.inner.baseurl))
+            .header(reqwest::header::ACCEPT, "application/json")
+            .header(
+                "api-version",
+                <generated::Client as progenitor_client::ClientInfo<()>>::api_version(),
+            )
+            .json(&request)
+            .send()
+            .await?;
 
-        to_json_value(response)
+        let status = response.status();
+        let bytes = response.bytes().await?;
+
+        if !status.is_success() {
+            return Err(http_error_from_bytes(status, &bytes));
+        }
+
+        let run = serde_json::from_slice::<generated::types::Run>(&bytes).map_err(|error| {
+            ApiError::Serialization(format!("invalid response payload: {error}"))
+        })?;
+
+        to_json_value(run)
     }
 
     pub async fn get_run(&self, run_id: &str) -> Result<Value, ApiError> {
@@ -335,7 +355,10 @@ fn map_generated_error<E: Serialize>(error: generated::Error<E>) -> ApiError {
         generated::Error::ErrorResponse(response) => {
             let status = response.status().as_u16();
             let body = serde_json::to_string(&response.into_inner()).ok();
-            let message = body.clone().unwrap_or_else(|| "request failed".to_string());
+            let message = body
+                .as_deref()
+                .and_then(summarize_error_payload)
+                .unwrap_or_else(|| body.clone().unwrap_or_else(|| "request failed".to_string()));
 
             ApiError::HttpStatus {
                 status,
@@ -343,13 +366,79 @@ fn map_generated_error<E: Serialize>(error: generated::Error<E>) -> ApiError {
                 body,
             }
         }
-        generated::Error::InvalidResponsePayload(_, error) => {
-            ApiError::Serialization(format!("invalid response payload: {error}"))
+        generated::Error::InvalidResponsePayload(bytes, error) => {
+            let payload = String::from_utf8_lossy(&bytes).trim().to_string();
+            let detail = if payload.is_empty() {
+                String::new()
+            } else {
+                format!("; response body: {payload}")
+            };
+
+            ApiError::Serialization(format!("invalid response payload: {error}{detail}"))
         }
         generated::Error::UnexpectedResponse(response) => ApiError::HttpStatus {
             status: response.status().as_u16(),
             message: "unexpected API response".to_string(),
             body: None,
         },
+    }
+}
+
+fn http_error_from_bytes(status: StatusCode, bytes: &[u8]) -> ApiError {
+    let body = String::from_utf8_lossy(bytes).trim().to_string();
+    let message = summarize_error_payload(&body).unwrap_or_else(|| {
+        if body.is_empty() {
+            "request failed".to_string()
+        } else {
+            body.clone()
+        }
+    });
+
+    ApiError::HttpStatus {
+        status: status.as_u16(),
+        message,
+        body: if body.is_empty() { None } else { Some(body) },
+    }
+}
+
+fn summarize_error_payload(raw: &str) -> Option<String> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    let value = serde_json::from_str::<Value>(trimmed).ok()?;
+
+    match value.get("detail") {
+        Some(Value::String(detail)) => Some(detail.clone()),
+        Some(Value::Object(detail)) => {
+            let error = detail.get("error").and_then(Value::as_str);
+            let details = detail.get("details").and_then(Value::as_str);
+
+            match (error, details) {
+                (Some(error), Some(details)) => Some(format!("{error} {details}")),
+                (Some(error), None) => Some(error.to_string()),
+                (None, Some(details)) => Some(details.to_string()),
+                _ => serde_json::to_string(detail).ok(),
+            }
+        }
+        Some(Value::Array(items)) => {
+            let messages: Vec<String> = items
+                .iter()
+                .filter_map(|item| {
+                    item.get("msg")
+                        .and_then(Value::as_str)
+                        .map(ToString::to_string)
+                })
+                .collect();
+
+            if messages.is_empty() {
+                serde_json::to_string(items).ok()
+            } else {
+                Some(messages.join("; "))
+            }
+        }
+        Some(other) => serde_json::to_string(other).ok(),
+        None => serde_json::to_string(&value).ok(),
     }
 }
