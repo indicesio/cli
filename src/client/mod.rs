@@ -3,8 +3,8 @@ pub mod generated;
 use std::str::FromStr;
 use std::time::Duration;
 
-use reqwest::header::{AUTHORIZATION, HeaderMap, HeaderValue};
 use reqwest::StatusCode;
+use reqwest::header::{AUTHORIZATION, HeaderMap, HeaderValue};
 use serde::Serialize;
 use serde_json::{Value, json};
 use thiserror::Error;
