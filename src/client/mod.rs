@@ -4,7 +4,7 @@ use std::str::FromStr;
 use std::time::Duration;
 
 use reqwest::StatusCode;
-use reqwest::header::{AUTHORIZATION, HeaderMap, HeaderValue};
+use reqwest::header::{ACCEPT, AUTHORIZATION, HeaderMap, HeaderValue};
 use serde::Serialize;
 use serde_json::{Value, json};
 use thiserror::Error;
@@ -85,12 +85,28 @@ impl ApiClient {
     }
 
     pub async fn auth_test_probe(&self) -> Result<Value, ApiError> {
-        let tasks = self
+        let response = self
             .inner
-            .list_tasks()
-            .await
-            .map_err(map_generated_error)?
-            .into_inner();
+            .client
+            .get(format!("{}/v1beta/tasks", self.inner.baseurl))
+            .header(ACCEPT, "application/json")
+            .header(
+                "api-version",
+                <generated::Client as progenitor_client::ClientInfo<()>>::api_version(),
+            )
+            .send()
+            .await?;
+
+        let status = response.status();
+        let bytes = response.bytes().await?;
+
+        if !status.is_success() {
+            return Err(http_error_from_bytes(status, &bytes));
+        }
+
+        let tasks = serde_json::from_slice::<Vec<Value>>(&bytes).map_err(|error| {
+            ApiError::Serialization(format!("invalid response payload: {error}"))
+        })?;
 
         Ok(json!({
             "ok": true,
@@ -440,5 +456,53 @@ fn summarize_error_payload(raw: &str) -> Option<String> {
         }
         Some(other) => serde_json::to_string(other).ok(),
         None => serde_json::to_string(&value).ok(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{ApiError, http_error_from_bytes, summarize_error_payload};
+    use reqwest::StatusCode;
+
+    #[test]
+    fn summarize_error_payload_prefers_detail_string() {
+        let raw = r#"{"detail":"invalid api key"}"#;
+        assert_eq!(
+            summarize_error_payload(raw).as_deref(),
+            Some("invalid api key")
+        );
+    }
+
+    #[test]
+    fn summarize_error_payload_combines_detail_object_fields() {
+        let raw = r#"{"detail":{"error":"forbidden","details":"workspace access required"}}"#;
+        assert_eq!(
+            summarize_error_payload(raw).as_deref(),
+            Some("forbidden workspace access required")
+        );
+    }
+
+    #[test]
+    fn http_error_from_bytes_preserves_backend_message() {
+        let error = http_error_from_bytes(
+            StatusCode::FORBIDDEN,
+            br#"{"detail":"api key missing required scope"}"#,
+        );
+
+        match error {
+            ApiError::HttpStatus {
+                status,
+                message,
+                body,
+            } => {
+                assert_eq!(status, 403);
+                assert_eq!(message, "api key missing required scope");
+                assert_eq!(
+                    body.as_deref(),
+                    Some(r#"{"detail":"api key missing required scope"}"#)
+                );
+            }
+            other => panic!("expected http status error, got {other:?}"),
+        }
     }
 }
