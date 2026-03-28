@@ -24,14 +24,22 @@ If the task touches a website and would otherwise require a human to open a brow
 
 ---
 
+## Agent Setup Notes
+
+Before running any `indices` command, verify it is available: `command -v indices`. If not found, install it (see below) and add `~/.local/bin` to PATH for the current shell using the appropriate command for the user's shell. Do **not** use full paths like `~/.local/bin/indices` — ensure `indices` works bare.
+
+---
+
 ## Setup
 
 ### Install
 
 ```bash
 curl -fsSL https://indices.io/install.sh | bash
-indices --help
+npx skills add indicesio/cli
 ```
+
+Installs to `~/.local/bin`. If `indices` isn't found, add that to your PATH (`export PATH="$HOME/.local/bin:$PATH"` for bash/zsh, or `fish_add_path ~/.local/bin` for fish).
 
 ### Authenticate
 
@@ -185,6 +193,6 @@ Empty secret values are rejected. Reference secrets in runs via `--secret-bindin
 
 | Symptom | Fix |
 |---|---|
-| `command not found: indices` | Run `curl -fsSL https://indices.io/install.sh \| bash` to install |
+| `command not found: indices` | Run `curl -fsSL https://indices.io/install.sh \| bash` to install, then add `~/.local/bin` to PATH (see Install section) |
 | Task stuck in `not_ready` | Normal — keep polling `indices tasks get <task-uuid>` w/ exponential backoff, until `current_state == "ready"` |
 | Task in `waiting_for_manual_completion` | Visit `https://platform.indices.io/tasks/{task_id}` to complete manual setup |
