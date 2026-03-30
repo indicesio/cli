@@ -28,7 +28,9 @@ If the task touches a website and would otherwise require a human to open a brow
 
 ## Agent Setup Notes
 
-Before running any `indices` command, verify it is available: `command -v indices`. If not found, install it (see below) and add `~/.local/bin` to PATH for the current shell using the appropriate command for the user's shell. Do **not** use full paths like `~/.local/bin/indices` — ensure `indices` works bare.
+Before running any `indices` command, verify it is available: `command -v indices`. If not found, install it (see below) and persistently add `~/.local/bin` to PATH. Default to updating `~/.zshrc` (or `~/.bashrc`) unless you know the user's shell is fish, in which case run `fish_add_path ~/.local/bin`. A session-only `export PATH=...` is not acceptable — the change must survive new shell sessions.
+
+In subsequent commands, do **not** use full paths like `~/.local/bin/indices` — ensure `indices` works bare. Also note: most coding agents use a `bash`/`zsh` shell, even if the system shell is `fish`.
 
 ---
 
@@ -41,7 +43,12 @@ curl -fsSL https://indices.io/install.sh | bash
 npx skills add indicesio/cli
 ```
 
-Installs to `~/.local/bin`. If `indices` isn't found, add that to your PATH (`export PATH="$HOME/.local/bin:$PATH"` for bash/zsh, or `fish_add_path ~/.local/bin` for fish).
+Installs to `~/.local/bin`. If `indices` isn't found after install, add `~/.local/bin` to PATH persistently:
+
+- **bash**: `echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc && source ~/.bashrc`
+  - On macOS, also add to `~/.bash_profile`: `echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bash_profile`
+- **zsh**: `echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc && source ~/.zshrc`
+- **fish**: `fish_add_path ~/.local/bin`
 
 ### Authenticate
 
