@@ -52,7 +52,7 @@ Commands render Markdown by default. Use `--json` on any command for JSON output
 
 Create methods support:
 - Argument mode by default (for example, `--task-id`, `--display-name`, `--website`, `--task`)
-- Piped JSON from stdin when no explicit source flags are provided:
+- Piped JSON from stdin:
   - `cat payload.json | indices runs create`
   - `cat payload.json | indices tasks create`
 - Explicit JSON payload sources: `--body`, `--file`, or `--stdin`
