@@ -3,6 +3,7 @@ use std::io;
 use std::io::Write;
 use std::path::PathBuf;
 
+use chrono::{DateTime, Utc};
 use directories::BaseDirs;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -22,7 +23,7 @@ pub enum OutputMode {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConfigFile {
     pub api_base: Option<String>,
-    pub api_key: Option<String>,
+    pub auth: Option<StoredAuth>,
     pub timeout_seconds: Option<u64>,
 }
 
@@ -30,9 +31,35 @@ impl Default for ConfigFile {
     fn default() -> Self {
         Self {
             api_base: Some(DEFAULT_API_BASE.to_string()),
-            api_key: None,
+            auth: None,
             timeout_seconds: Some(DEFAULT_TIMEOUT_SECONDS),
         }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(tag = "method", rename_all = "snake_case")]
+pub enum StoredAuth {
+    ApiKey {
+        api_key: String,
+    },
+    OAuth {
+        access_token: String,
+        refresh_token: String,
+        expires_at: DateTime<Utc>,
+    },
+}
+
+impl StoredAuth {
+    pub fn bearer_token(&self) -> &str {
+        match self {
+            StoredAuth::ApiKey { api_key } => api_key,
+            StoredAuth::OAuth { access_token, .. } => access_token,
+        }
+    }
+
+    pub fn is_oauth(&self) -> bool {
+        matches!(self, StoredAuth::OAuth { .. })
     }
 }
 
@@ -56,7 +83,7 @@ pub enum ConfigError {
 #[derive(Debug, Clone)]
 pub struct RuntimeConfig {
     pub api_base: String,
-    pub api_key: Option<String>,
+    pub auth: Option<StoredAuth>,
     pub timeout_seconds: u64,
 }
 
@@ -116,18 +143,18 @@ impl ConfigStore {
 
         Ok(RuntimeConfig {
             api_base,
-            api_key: self.data.api_key.clone(),
+            auth: self.data.auth.clone(),
             timeout_seconds,
         })
     }
 
-    pub fn set_api_key(
+    pub fn set_auth(
         &mut self,
-        api_key: String,
+        auth: StoredAuth,
         api_base: Option<&str>,
         timeout_seconds: Option<u64>,
     ) -> Result<(), ConfigError> {
-        self.data.api_key = Some(api_key);
+        self.data.auth = Some(auth);
 
         if let Some(api_base) = api_base {
             self.data.api_base = Some(api_base.to_string());
@@ -140,8 +167,8 @@ impl ConfigStore {
         self.persist()
     }
 
-    pub fn clear_api_key(&mut self) -> Result<bool, ConfigError> {
-        let existed = self.data.api_key.take().is_some();
+    pub fn clear_auth(&mut self) -> Result<bool, ConfigError> {
+        let existed = self.data.auth.take().is_some();
         self.persist()?;
         Ok(existed)
     }

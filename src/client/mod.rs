@@ -13,7 +13,7 @@ use uuid::Uuid;
 #[derive(Debug, Clone)]
 pub struct ClientOptions {
     pub api_base: String,
-    pub api_key: String,
+    pub bearer_token: String,
     pub timeout_seconds: u64,
 }
 
@@ -67,9 +67,11 @@ impl ApiClient {
             .map_err(|_| ApiError::InvalidBaseUrl(options.api_base.clone()))?;
 
         let mut headers = HeaderMap::new();
-        let mut auth_value = HeaderValue::from_str(&format!("Bearer {}", options.api_key))
+        let mut auth_value = HeaderValue::from_str(&format!("Bearer {}", options.bearer_token))
             .map_err(|_| {
-                ApiError::InvalidRequest("API key contains invalid header characters".to_string())
+                ApiError::InvalidRequest(
+                    "bearer token contains invalid header characters".to_string(),
+                )
             })?;
         auth_value.set_sensitive(true);
         headers.insert(AUTHORIZATION, auth_value);

@@ -86,9 +86,9 @@ pub struct Cli {
 
 #[derive(Debug, Subcommand)]
 pub enum Command {
-    #[command(about = "Authenticate and store API credentials")]
+    #[command(about = "Authenticate and store credentials")]
     Login(LoginArgs),
-    #[command(about = "Remove stored API credentials")]
+    #[command(about = "Remove stored credentials")]
     Logout,
     #[command(about = "Verify current authentication")]
     AuthTest,
@@ -111,10 +111,20 @@ pub enum Command {
 
 #[derive(Debug, Args)]
 pub struct LoginArgs {
-    #[arg(long)]
+    #[arg(
+        long,
+        num_args = 0..=1,
+        default_missing_value = "",
+        value_name = "API_KEY",
+        help = "Use API-key auth instead of the default browser-based OAuth flow"
+    )]
     pub api_key: Option<String>,
 
-    #[arg(long, default_value_t = false)]
+    #[arg(
+        long,
+        default_value_t = false,
+        help = "Skip authentication verification"
+    )]
     pub no_verify: bool,
 }
 
@@ -314,7 +324,7 @@ pub struct DeleteSecretArgs {
 mod tests {
     use clap::Parser;
 
-    use super::{Cli, Command, RunIdArgs, RunsCommand};
+    use super::{Cli, Command, LoginArgs, RunIdArgs, RunsCommand};
 
     #[test]
     fn parses_json_flag_as_global_option() {
@@ -338,6 +348,19 @@ mod tests {
             Command::Runs {
                 command: RunsCommand::Logs(RunIdArgs { ref run_id })
             } if run_id == "11111111-1111-1111-1111-111111111111"
+        ));
+    }
+
+    #[test]
+    fn parses_login_api_key_flag_without_value() {
+        let cli = Cli::parse_from(["indices", "login", "--api-key"]);
+
+        assert!(matches!(
+            cli.command,
+            Command::Login(LoginArgs {
+                api_key: Some(ref api_key),
+                no_verify: false,
+            }) if api_key.is_empty()
         ));
     }
 }

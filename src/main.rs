@@ -3,13 +3,15 @@ mod client;
 mod commands;
 mod config;
 mod errors;
+mod oauth;
 mod output;
 
 use clap::Parser;
+use serde_json::Value;
 
 use crate::cli::{Cli, Command};
 use crate::client::{ApiClient, ClientOptions};
-use crate::config::{ConfigStore, OutputMode, RuntimeOverrides};
+use crate::config::{ConfigStore, OutputMode, RuntimeConfig, RuntimeOverrides, StoredAuth};
 use crate::errors::CliError;
 
 #[tokio::main]
@@ -58,26 +60,18 @@ async fn run() -> Result<(), CliError> {
     }
 
     let runtime = config_store.resolve_runtime(&overrides)?;
-    let api_key = runtime.api_key.clone().ok_or(CliError::NotAuthenticated)?;
+    let mut auth = runtime.auth.clone().ok_or(CliError::NotAuthenticated)?;
+    refresh_auth_if_needed(&mut config_store, &runtime, &mut auth, false).await?;
 
-    let client = ApiClient::new(ClientOptions {
-        api_base: runtime.api_base.clone(),
-        api_key,
-        timeout_seconds: runtime.timeout_seconds,
-    })?;
-
-    let response = match &cli.command {
-        Command::AuthTest => commands::auth::auth_test(&client).await?,
-        Command::Tasks { command } => {
-            commands::tasks::handle_tasks_command(&client, command).await?
+    let mut client = build_client(&runtime, &auth)?;
+    let response = match execute_authenticated_command(&cli.command, &client).await {
+        Ok(response) => response,
+        Err(CliError::Api(api_error)) if api_error.is_unauthorized() && auth.is_oauth() => {
+            refresh_auth_if_needed(&mut config_store, &runtime, &mut auth, true).await?;
+            client = build_client(&runtime, &auth)?;
+            execute_authenticated_command(&cli.command, &client).await?
         }
-        Command::Runs { command } => commands::runs::handle_runs_command(&client, command).await?,
-        Command::Secrets { command } => {
-            commands::secrets::handle_secrets_command(&client, command).await?
-        }
-        Command::Login(_) | Command::Logout => {
-            return Err(CliError::Message("unexpected command routing".to_string()));
-        }
+        Err(error) => return Err(error),
     };
 
     let output_mode = if cli.json {
@@ -87,4 +81,47 @@ async fn run() -> Result<(), CliError> {
     };
     output::print_response(&response, output_mode)?;
     Ok(())
+}
+
+fn build_client(runtime: &RuntimeConfig, auth: &StoredAuth) -> Result<ApiClient, CliError> {
+    Ok(ApiClient::new(ClientOptions {
+        api_base: runtime.api_base.clone(),
+        bearer_token: auth.bearer_token().to_string(),
+        timeout_seconds: runtime.timeout_seconds,
+    })?)
+}
+
+async fn refresh_auth_if_needed(
+    config_store: &mut ConfigStore,
+    runtime: &RuntimeConfig,
+    auth: &mut StoredAuth,
+    force: bool,
+) -> Result<(), CliError> {
+    if let Some(refreshed) = oauth::refresh_auth(auth, runtime.timeout_seconds, force).await? {
+        config_store.set_auth(
+            refreshed.clone(),
+            Some(runtime.api_base.as_str()),
+            Some(runtime.timeout_seconds),
+        )?;
+        *auth = refreshed;
+    }
+
+    Ok(())
+}
+
+async fn execute_authenticated_command(
+    command: &Command,
+    client: &ApiClient,
+) -> Result<Value, CliError> {
+    match command {
+        Command::AuthTest => commands::auth::auth_test(client).await,
+        Command::Tasks { command } => commands::tasks::handle_tasks_command(client, command).await,
+        Command::Runs { command } => commands::runs::handle_runs_command(client, command).await,
+        Command::Secrets { command } => {
+            commands::secrets::handle_secrets_command(client, command).await
+        }
+        Command::Login(_) | Command::Logout => {
+            Err(CliError::Message("unexpected command routing".to_string()))
+        }
+    }
 }

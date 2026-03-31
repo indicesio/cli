@@ -18,6 +18,8 @@ pub enum CliError {
     #[error(transparent)]
     Api(#[from] ApiError),
     #[error(transparent)]
+    Http(#[from] reqwest::Error),
+    #[error(transparent)]
     Io(#[from] io::Error),
     #[error(transparent)]
     Json(#[from] serde_json::Error),
@@ -33,6 +35,12 @@ impl CliError {
             CliError::Api(api_error) if api_error.is_unauthorized() => 3,
             CliError::Api(api_error) if api_error.is_timeout_or_network() => 4,
             CliError::Api(_) => 5,
+            CliError::Http(error)
+                if error.is_timeout() || error.is_connect() || error.is_request() =>
+            {
+                4
+            }
+            CliError::Http(_) => 5,
             CliError::Io(_) | CliError::Json(_) => 5,
         }
     }

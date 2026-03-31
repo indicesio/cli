@@ -36,6 +36,8 @@ cargo install --path .
 
 ```bash
 indices login
+indices login --api-key
+indices login --api-key "idx_..."
 indices auth-test
 indices tasks list
 indices tasks create --display-name "Apply Job" --website "https://example.com" --task "Fill form"
@@ -63,6 +65,8 @@ Config is stored at:
 
 - macOS/Linux: `~/.config/indices/config.toml`
 - Windows: platform-specific config directory via `directories`
+
+`indices login` uses browser-based OAuth by default. An API-key flow is available with `indices login --api-key`.
 
 ## Release assets
 
