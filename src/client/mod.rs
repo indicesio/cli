@@ -4,11 +4,14 @@ use std::str::FromStr;
 use std::time::Duration;
 
 use reqwest::StatusCode;
-use reqwest::header::{ACCEPT, AUTHORIZATION, HeaderMap, HeaderValue};
+use reqwest::header::{ACCEPT, AUTHORIZATION, HeaderMap, HeaderName, HeaderValue};
 use serde::Serialize;
 use serde_json::{Value, json};
 use thiserror::Error;
 use uuid::Uuid;
+
+const REQUEST_SOURCE_HEADER: &str = "x-indices-request-source";
+const REQUEST_SOURCE_CLI: &str = "cli";
 
 #[derive(Debug, Clone)]
 pub struct ClientOptions {
@@ -75,6 +78,10 @@ impl ApiClient {
             })?;
         auth_value.set_sensitive(true);
         headers.insert(AUTHORIZATION, auth_value);
+        headers.insert(
+            HeaderName::from_static(REQUEST_SOURCE_HEADER),
+            HeaderValue::from_static(REQUEST_SOURCE_CLI),
+        );
 
         let http = reqwest::Client::builder()
             .default_headers(headers)
