@@ -1,25 +1,24 @@
 # indices-cli
 
-Rust CLI for the Indices API.
+A CLI interface for the Indices API.
 
 ## Install
 
 ### macOS and Linux
 
 ```bash
-curl -fsSL https://indices.io/install.sh | bash
+curl -fsSL https://indices.io/install.sh | sh
 ```
 
-Install a specific version:
+You can customise the install command, if you wish:
+
 
 ```bash
-curl -fsSL https://indices.io/install.sh | bash -s -- --version 0.1.0
-```
+# Install a specific version:
+curl -fsSL https://indices.io/install.sh | sh -s -- --version 0.1.0
 
-Install to a custom directory:
-
-```bash
-curl -fsSL https://indices.io/install.sh | bash -s -- --install-dir /usr/local/bin --yes
+# Install to a custom directory:
+curl -fsSL https://indices.io/install.sh | sh -s -- --install-dir /usr/local/bin --yes
 ```
 
 ### Windows

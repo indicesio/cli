@@ -1,5 +1,7 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/bin/sh
+# shellcheck shell=sh
+
+set -eu
 
 INDICES_REPO="indicesio/cli"
 DEFAULT_INSTALL_DIR="${INDICES_INSTALL_DIR:-$HOME/.local/bin}"
@@ -9,7 +11,7 @@ ASSUME_YES=0
 INSTALL_TMPDIR=""
 
 usage() {
-  cat <<'EOF'
+    cat <<'EOF'
 Usage: install.sh [options]
 
 Install the Indices CLI from GitHub Releases.
@@ -26,197 +28,257 @@ Environment variables:
 EOF
 }
 
-require_cmd() {
-  if ! command -v "$1" >/dev/null 2>&1; then
-    echo "Missing required command: $1" >&2
-    exit 1
-  fi
+say() {
+    printf '%s\n' "$1" >&2
+}
+
+err() {
+    printf 'error: %s\n' "$1" >&2
+}
+
+check_cmd() {
+    command -v "$1" >/dev/null 2>&1
+}
+
+need_cmd() {
+    if ! check_cmd "$1"; then
+        err "missing required command: $1"
+        exit 1
+    fi
+}
+
+ensure() {
+    if ! "$@"; then
+        err "command failed: $*"
+        exit 1
+    fi
 }
 
 cleanup_install_tmpdir() {
-  if [[ -n "${INSTALL_TMPDIR:-}" && -d "${INSTALL_TMPDIR}" ]]; then
-    rm -rf "${INSTALL_TMPDIR}"
-  fi
+    if [ -n "${INSTALL_TMPDIR}" ] && [ -d "${INSTALL_TMPDIR}" ]; then
+        rm -rf "${INSTALL_TMPDIR}"
+    fi
 }
 
 normalize_version() {
-  local raw="$1"
-  if [[ -z "$raw" ]]; then
-    echo ""
-    return
-  fi
+    version="$1"
 
-  if [[ "$raw" == v* ]]; then
-    echo "$raw"
-  else
-    echo "v$raw"
-  fi
+    if [ -z "$version" ]; then
+        printf '\n'
+    elif [ "${version#v}" != "$version" ]; then
+        printf '%s\n' "$version"
+    else
+        printf 'v%s\n' "$version"
+    fi
+}
+
+validate_version_tag() {
+    version_tag="$1"
+
+    case "$version_tag" in
+        v[0-9]*.[0-9]*.[0-9]*)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
 }
 
 latest_version_tag() {
-  local latest_url tag
-  latest_url="$(curl -fsSLI -o /dev/null -w '%{url_effective}' "https://github.com/${INDICES_REPO}/releases/latest")"
-  tag="${latest_url##*/}"
+    latest_url="$(
+        curl -fsSLI -o /dev/null -w '%{url_effective}' \
+            "https://github.com/${INDICES_REPO}/releases/latest"
+    )"
+    tag="${latest_url##*/}"
 
-  if [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z]+)*$ ]]; then
-    echo "$tag"
-    return
-  fi
+    if validate_version_tag "$tag"; then
+        printf '%s\n' "$tag"
+        return 0
+    fi
 
-  echo "Failed to resolve latest release tag for ${INDICES_REPO}" >&2
-  exit 1
+    err "failed to resolve latest release tag for ${INDICES_REPO}"
+    exit 1
 }
 
 parse_args() {
-  while [[ $# -gt 0 ]]; do
-    case "$1" in
-      --version)
-        if [[ $# -lt 2 ]]; then
-          echo "--version requires a value" >&2
-          exit 1
-        fi
-        VERSION_INPUT="$2"
-        shift 2
-        ;;
-      --install-dir)
-        if [[ $# -lt 2 ]]; then
-          echo "--install-dir requires a value" >&2
-          exit 1
-        fi
-        INSTALL_DIR="$2"
-        shift 2
-        ;;
-      --yes)
-        ASSUME_YES=1
-        shift
-        ;;
-      --help)
-        usage
-        exit 0
-        ;;
-      *)
-        echo "Unknown argument: $1" >&2
-        usage
-        exit 1
-        ;;
-    esac
-  done
+    while [ "$#" -gt 0 ]; do
+        case "$1" in
+            --version)
+                if [ "$#" -lt 2 ]; then
+                    err "--version requires a value"
+                    exit 1
+                fi
+                VERSION_INPUT="$2"
+                shift 2
+                ;;
+            --install-dir)
+                if [ "$#" -lt 2 ]; then
+                    err "--install-dir requires a value"
+                    exit 1
+                fi
+                INSTALL_DIR="$2"
+                shift 2
+                ;;
+            --yes)
+                ASSUME_YES=1
+                shift
+                ;;
+            --help)
+                usage
+                exit 0
+                ;;
+            *)
+                err "unknown argument: $1"
+                usage >&2
+                exit 1
+                ;;
+        esac
+    done
 }
 
 pick_platform() {
-  local os arch
-  os="$(uname -s | tr '[:upper:]' '[:lower:]')"
-  arch="$(uname -m)"
+    os="$(uname -s | tr '[:upper:]' '[:lower:]')"
+    arch="$(uname -m)"
 
-  case "$os" in
-    darwin) os="darwin" ;;
-    linux) os="linux" ;;
-    *)
-      echo "Unsupported operating system: $os" >&2
-      echo "For Windows, download the ZIP asset from GitHub Releases." >&2
-      exit 1
-      ;;
-  esac
+    case "$os" in
+        darwin|linux)
+            ;;
+        *)
+            err "unsupported operating system: $os"
+            say "For Windows, download the ZIP asset from GitHub Releases."
+            exit 1
+            ;;
+    esac
 
-  case "$arch" in
-    x86_64|amd64) arch="x86_64" ;;
-    arm64|aarch64) arch="arm64" ;;
-    *)
-      echo "Unsupported architecture: $arch" >&2
-      exit 1
-      ;;
-  esac
+    case "$arch" in
+        x86_64|amd64)
+            arch="x86_64"
+            ;;
+        arm64|aarch64)
+            arch="arm64"
+            ;;
+        *)
+            err "unsupported architecture: $arch"
+            exit 1
+            ;;
+    esac
 
-  printf "%s_%s" "$os" "$arch"
+    printf '%s_%s\n' "$os" "$arch"
+}
+
+compute_sha256() {
+    asset_path="$1"
+
+    if check_cmd sha256sum; then
+        sha256sum "$asset_path" | awk '{ print $1 }'
+    elif check_cmd shasum; then
+        shasum -a 256 "$asset_path" | awk '{ print $1 }'
+    else
+        err "missing required checksum tool: sha256sum or shasum"
+        exit 1
+    fi
 }
 
 verify_checksum() {
-  local asset_path checksums_path asset_name expected actual
-  asset_path="$1"
-  checksums_path="$2"
-  asset_name="$(basename "$asset_path")"
+    asset_path="$1"
+    checksums_path="$2"
+    asset_name="$(basename "$asset_path")"
+    expected="$(
+        awk -v file="$asset_name" '$2 == file { print $1 }' "$checksums_path"
+    )"
 
-  expected="$(awk -v file="$asset_name" '$2 == file { print $1 }' "$checksums_path")"
-  if [[ -z "$expected" ]]; then
-    echo "No checksum entry found for ${asset_name}" >&2
-    exit 1
-  fi
+    if [ -z "$expected" ]; then
+        err "no checksum entry found for ${asset_name}"
+        exit 1
+    fi
 
-  if command -v sha256sum >/dev/null 2>&1; then
-    actual="$(sha256sum "$asset_path" | awk '{ print $1 }')"
-  elif command -v shasum >/dev/null 2>&1; then
-    actual="$(shasum -a 256 "$asset_path" | awk '{ print $1 }')"
-  else
-    echo "Missing required checksum tool: sha256sum or shasum" >&2
-    exit 1
-  fi
+    actual="$(compute_sha256 "$asset_path")"
+    if [ "$actual" != "$expected" ]; then
+        err "checksum verification failed for ${asset_name}"
+        say "Expected: ${expected}"
+        say "Actual:   ${actual}"
+        exit 1
+    fi
+}
 
-  if [[ "$actual" != "$expected" ]]; then
-    echo "Checksum verification failed for ${asset_name}" >&2
-    echo "Expected: ${expected}" >&2
-    echo "Actual:   ${actual}" >&2
-    exit 1
-  fi
+confirm_overwrite() {
+    destination="$1"
+
+    if [ ! -f "$destination" ] || [ "$ASSUME_YES" -eq 1 ] || [ ! -t 0 ]; then
+        return 0
+    fi
+
+    printf '%s exists. Overwrite? [y/N] ' "$destination" >&2
+    read -r reply
+
+    case "$reply" in
+        y|Y)
+            return 0
+            ;;
+        *)
+            say "Installation cancelled."
+            exit 1
+            ;;
+    esac
 }
 
 install_binary() {
-  local binary_path destination
-  binary_path="$1"
-  destination="${INSTALL_DIR}/indices"
+    binary_path="$1"
+    destination="${INSTALL_DIR}/indices"
 
-  mkdir -p "$INSTALL_DIR"
-
-  if [[ -f "$destination" && "$ASSUME_YES" -ne 1 && -t 0 ]]; then
-    read -r -p "${destination} exists. Overwrite? [y/N] " reply
-    if [[ ! "$reply" =~ ^[Yy]$ ]]; then
-      echo "Installation cancelled."
-      exit 1
-    fi
-  fi
-
-  cp "$binary_path" "$destination"
-  chmod 0755 "$destination"
+    ensure mkdir -p "$INSTALL_DIR"
+    confirm_overwrite "$destination"
+    ensure cp "$binary_path" "$destination"
+    ensure chmod 0755 "$destination"
 }
 
 main() {
-  parse_args "$@"
-  trap cleanup_install_tmpdir EXIT
+    parse_args "$@"
+    trap cleanup_install_tmpdir EXIT INT TERM HUP
 
-  require_cmd curl
-  require_cmd tar
+    need_cmd curl
+    need_cmd tar
+    need_cmd mktemp
+    need_cmd uname
+    need_cmd awk
+    need_cmd basename
+    need_cmd cp
+    need_cmd chmod
+    need_cmd mkdir
 
-  local platform tag version asset_name checksums_name base_url asset_path checksums_path
-  platform="$(pick_platform)"
-  tag="$(normalize_version "$VERSION_INPUT")"
+    platform="$(pick_platform)"
+    tag="$(normalize_version "$VERSION_INPUT")"
 
-  if [[ -z "$tag" ]]; then
-    tag="$(latest_version_tag)"
-  fi
+    if [ -z "$tag" ]; then
+        tag="$(latest_version_tag)"
+    fi
 
-  version="${tag#v}"
-  asset_name="indices_${version}_${platform}.tar.gz"
-  checksums_name="indices_${version}_checksums.txt"
-  base_url="https://github.com/${INDICES_REPO}/releases/download/${tag}"
+    version="${tag#v}"
+    asset_name="indices_${version}_${platform}.tar.gz"
+    checksums_name="indices_${version}_checksums.txt"
+    base_url="https://github.com/${INDICES_REPO}/releases/download/${tag}"
 
-  INSTALL_TMPDIR="$(mktemp -d)"
+    INSTALL_TMPDIR="$(mktemp -d)"
+    asset_path="${INSTALL_TMPDIR}/${asset_name}"
+    checksums_path="${INSTALL_TMPDIR}/${checksums_name}"
 
-  asset_path="${INSTALL_TMPDIR}/${asset_name}"
-  checksums_path="${INSTALL_TMPDIR}/${checksums_name}"
+    say "Installing Indices CLI ${tag} for ${platform} from ${INDICES_REPO}"
 
-  echo "Installing indices ${tag} for ${platform} from ${INDICES_REPO}"
+    ensure curl -fsSL "${base_url}/${asset_name}" -o "$asset_path"
+    ensure curl -fsSL "${base_url}/${checksums_name}" -o "$checksums_path"
+    verify_checksum "$asset_path" "$checksums_path"
+    ensure tar -xzf "$asset_path" -C "$INSTALL_TMPDIR"
+    install_binary "${INSTALL_TMPDIR}/indices"
 
-  curl -fsSL "${base_url}/${asset_name}" -o "$asset_path"
-  curl -fsSL "${base_url}/${checksums_name}" -o "$checksums_path"
-
-  verify_checksum "$asset_path" "$checksums_path"
-
-  tar -xzf "$asset_path" -C "${INSTALL_TMPDIR}"
-  install_binary "${INSTALL_TMPDIR}/indices"
-
-  echo "Installed to ${INSTALL_DIR}/indices"
-  if [[ ":$PATH:" != *":${INSTALL_DIR}:"* ]]; then
-    echo "Add ${INSTALL_DIR} to your PATH to run 'indices' directly."
-  fi
+    say "Installed to ${INSTALL_DIR}/indices"
+    case ":${PATH:-}:" in
+        *:"${INSTALL_DIR}":*)
+            ;;
+        *)
+            say "Add ${INSTALL_DIR} to your PATH to run 'indices' directly."
+            ;;
+    esac
 }
 
 main "$@"

@@ -36,4 +36,6 @@ jobs:
         run: cargo build --locked
 
       - name: Validate installer script
-        run: bash -n install.sh
+        run: |
+          sh -n install.sh
+          shellcheck install.sh
