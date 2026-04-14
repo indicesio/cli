@@ -2,6 +2,7 @@ use serde_json::{Map, Value};
 
 use crate::config::OutputMode;
 use crate::errors::CliError;
+use crate::commands::auth::WhoamiOutput;
 
 const PRIORITY_KEYS: &[&str] = &[
     "id",
@@ -26,6 +27,17 @@ pub fn print_response(value: &Value, mode: OutputMode) -> Result<(), CliError> {
             println!("{}", serde_json::to_string_pretty(value)?);
         }
         OutputMode::Markdown => print_markdown(value),
+    }
+
+    Ok(())
+}
+
+pub fn print_whoami(output: &WhoamiOutput, mode: OutputMode) -> Result<(), CliError> {
+    match mode {
+        OutputMode::Json => {
+            println!("{}", serde_json::to_string_pretty(output)?);
+        }
+        OutputMode::Markdown => print_whoami_pretty(output),
     }
 
     Ok(())
@@ -202,4 +214,26 @@ fn stringify_value(value: &Value) -> String {
         Value::String(v) => v.to_string(),
         Value::Array(_) | Value::Object(_) => serde_json::to_string(value).unwrap_or_default(),
     }
+}
+
+fn print_whoami_pretty(output: &WhoamiOutput) {
+    const GREEN: &str = "\x1b[32m";
+    const CYAN: &str = "\x1b[36m";
+    const GREY: &str = "\x1b[90m";
+    const RESET: &str = "\x1b[0m";
+
+    println!("{GREEN}✔{RESET} You are logged in to Indices");
+
+    let mut rows = Vec::new();
+    if let Some(email) = &output.email {
+        rows.push(("Email", email.clone()));
+    }
+    rows.push(("User ID", stringify_value(&output.user_id)));
+
+    let width = rows.iter().map(|(label, _)| label.len()).max().unwrap_or(0);
+    for (label, value) in rows {
+        println!("{label:<width$}  {value}", width = width);
+    }
+
+    println!("{GREY}Run {CYAN}indices logout{GREY} to log out{RESET}");
 }

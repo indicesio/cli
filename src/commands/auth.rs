@@ -1,12 +1,19 @@
 use std::io::{self, Write};
 
-use serde_json::{Value, json};
+use serde::Serialize;
+use serde_json::Value;
 
 use crate::cli::LoginArgs;
-use crate::client::{ApiClient, ClientOptions};
+use crate::client::{ApiClient, ClientOptions, MeResponse};
 use crate::config::{ConfigStore, RuntimeConfig, StoredAuth};
 use crate::errors::CliError;
 use crate::oauth;
+
+#[derive(Debug, Clone, Serialize)]
+pub struct WhoamiOutput {
+    pub user_id: Value,
+    pub email: Option<String>,
+}
 
 pub async fn login(
     config_store: &mut ConfigStore,
@@ -37,7 +44,7 @@ pub async fn login(
             timeout_seconds: runtime.timeout_seconds,
         })?;
 
-        client.auth_test_probe().await.map_err(|error| {
+        client.get_me().await.map_err(|error| {
             CliError::Message(format!("authentication verification failed: {error}"))
         })?;
     }
@@ -69,13 +76,10 @@ pub fn logout(config_store: &mut ConfigStore) -> Result<(), CliError> {
     Ok(())
 }
 
-pub async fn auth_test(client: &ApiClient) -> Result<Value, CliError> {
-    let probe = client.auth_test_probe().await?;
+pub async fn whoami(client: &ApiClient) -> Result<WhoamiOutput, CliError> {
+    let MeResponse { user_id, email } = client.get_me().await?;
 
-    Ok(json!({
-        "authenticated": true,
-        "probe": probe,
-    }))
+    Ok(WhoamiOutput { user_id, email })
 }
 
 fn read_api_key_from_prompt() -> Result<String, CliError> {

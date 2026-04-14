@@ -37,7 +37,7 @@ cargo install --path .
 indices login
 indices login --api-key
 indices login --api-key "idx_..."
-indices auth-test
+indices whoami
 indices tasks list
 indices tasks create --display-name "Apply Job" --website "https://example.com" --task "Fill form"
 indices runs create --task-id "<task-uuid>" --arguments '{"job_id":"123"}'

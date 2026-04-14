@@ -55,7 +55,7 @@ Installs to `~/.local/bin`. If `indices` isn't found after install, add `~/.loca
 ```bash
 indices login --api-key "<your-api-key>"    # non-interactive
 indices login                               # prompts securely
-indices auth-test                           # verify stored credentials
+indices whoami                              # verify stored credentials
 ```
 
 ---
@@ -107,7 +107,7 @@ When exact flags matter, verify them with `indices <command> --help`.
 ```bash
 indices login                          # prompts securely for API key
 indices login --api-key "<key>"        # non-interactive
-indices auth-test                      # verify stored credentials
+indices whoami                         # verify stored credentials
 indices logout                         # remove stored API key
 ```
 

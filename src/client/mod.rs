@@ -5,8 +5,8 @@ use std::time::Duration;
 
 use reqwest::StatusCode;
 use reqwest::header::{ACCEPT, AUTHORIZATION, HeaderMap, HeaderName, HeaderValue};
-use serde::Serialize;
-use serde_json::{Value, json};
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use thiserror::Error;
 use uuid::Uuid;
 
@@ -23,6 +23,12 @@ pub struct ClientOptions {
 #[derive(Debug)]
 pub struct ApiClient {
     inner: generated::Client,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MeResponse {
+    pub user_id: Value,
+    pub email: Option<String>,
 }
 
 #[derive(Debug, Error)]
@@ -93,11 +99,11 @@ impl ApiClient {
         })
     }
 
-    pub async fn auth_test_probe(&self) -> Result<Value, ApiError> {
+    pub async fn get_me(&self) -> Result<MeResponse, ApiError> {
         let response = self
             .inner
             .client
-            .get(format!("{}/v1beta/tasks", self.inner.baseurl))
+            .get(format!("{}/v1beta/me", self.inner.baseurl))
             .header(ACCEPT, "application/json")
             .header(
                 "api-version",
@@ -113,14 +119,9 @@ impl ApiClient {
             return Err(http_error_from_bytes(status, &bytes));
         }
 
-        let tasks = serde_json::from_slice::<Vec<Value>>(&bytes).map_err(|error| {
+        serde_json::from_slice::<MeResponse>(&bytes).map_err(|error| {
             ApiError::Serialization(format!("invalid response payload: {error}"))
-        })?;
-
-        Ok(json!({
-            "ok": true,
-            "tasks_visible": tasks.len(),
-        }))
+        })
     }
 
     pub async fn create_task(&self, body: Value) -> Result<Value, ApiError> {

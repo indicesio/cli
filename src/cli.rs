@@ -90,8 +90,8 @@ pub enum Command {
     Login(LoginArgs),
     #[command(about = "Remove stored credentials")]
     Logout,
-    #[command(about = "Verify current authentication")]
-    AuthTest,
+    #[command(about = "Show the current authenticated user")]
+    Whoami,
     #[command(about = "Manage tasks")]
     Tasks {
         #[command(subcommand)]
@@ -362,5 +362,12 @@ mod tests {
                 no_verify: false,
             }) if api_key.is_empty()
         ));
+    }
+
+    #[test]
+    fn parses_whoami_command() {
+        let cli = Cli::parse_from(["indices", "whoami"]);
+
+        assert!(matches!(cli.command, Command::Whoami));
     }
 }

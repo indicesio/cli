@@ -11,8 +11,14 @@ use serde_json::Value;
 
 use crate::cli::{Cli, Command};
 use crate::client::{ApiClient, ClientOptions};
+use crate::commands::auth::WhoamiOutput;
 use crate::config::{ConfigStore, OutputMode, RuntimeConfig, RuntimeOverrides, StoredAuth};
 use crate::errors::CliError;
+
+enum CommandResponse {
+    Value(Value),
+    Whoami(WhoamiOutput),
+}
 
 #[tokio::main]
 async fn main() {
@@ -79,7 +85,10 @@ async fn run() -> Result<(), CliError> {
     } else {
         OutputMode::Markdown
     };
-    output::print_response(&response, output_mode)?;
+    match response {
+        CommandResponse::Value(value) => output::print_response(&value, output_mode)?,
+        CommandResponse::Whoami(output) => output::print_whoami(&output, output_mode)?,
+    }
     Ok(())
 }
 
@@ -112,13 +121,19 @@ async fn refresh_auth_if_needed(
 async fn execute_authenticated_command(
     command: &Command,
     client: &ApiClient,
-) -> Result<Value, CliError> {
+) -> Result<CommandResponse, CliError> {
     match command {
-        Command::AuthTest => commands::auth::auth_test(client).await,
-        Command::Tasks { command } => commands::tasks::handle_tasks_command(client, command).await,
-        Command::Runs { command } => commands::runs::handle_runs_command(client, command).await,
+        Command::Whoami => Ok(CommandResponse::Whoami(commands::auth::whoami(client).await?)),
+        Command::Tasks { command } => Ok(CommandResponse::Value(
+            commands::tasks::handle_tasks_command(client, command).await?,
+        )),
+        Command::Runs { command } => Ok(CommandResponse::Value(
+            commands::runs::handle_runs_command(client, command).await?,
+        )),
         Command::Secrets { command } => {
-            commands::secrets::handle_secrets_command(client, command).await
+            Ok(CommandResponse::Value(
+                commands::secrets::handle_secrets_command(client, command).await?,
+            ))
         }
         Command::Login(_) | Command::Logout => {
             Err(CliError::Message("unexpected command routing".to_string()))
