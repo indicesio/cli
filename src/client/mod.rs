@@ -103,7 +103,7 @@ impl ApiClient {
         let response = self
             .inner
             .client
-            .get(format!("{}/v1beta/me", self.inner.baseurl))
+            .get(format!("{}/v1beta/identity", self.inner.baseurl))
             .header(ACCEPT, "application/json")
             .header(
                 "api-version",

@@ -4,6 +4,7 @@ use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use serde::Serialize;
 use serde_json::Value;
+use tracing::warn;
 
 use crate::cli::LoginArgs;
 use crate::client::{ApiClient, ClientOptions, IdentityResponse};
@@ -48,7 +49,11 @@ pub async fn login(
             timeout_seconds: runtime.timeout_seconds,
         })?;
 
-        identity = identity_from_api(&client).await;
+        // Override identity from JWT only if the identity from API is non-empty
+        // Note: it may be empty if internet issues contacting the Indices API
+        if let Some(api_identity) = identity_from_api(&client).await {
+            identity = Some(api_identity);
+        }
     }
 
     let stored_message = match &auth {
@@ -98,16 +103,33 @@ fn identity_from_jwt(auth: &StoredAuth) -> Option<CachedIdentity> {
         return None;
     };
 
-    // JWT structure: header, payload, signature verification (split by .)
-    // TODO: log error
-    let payload = access_token.split('.').nth(1)?;
-    let bytes = URL_SAFE_NO_PAD.decode(payload).ok()?;
-    let value = serde_json::from_slice::<Value>(&bytes).ok()?;
+    let payload = match access_token.split('.').nth(1) {
+        Some(payload) => payload,
+        None => {
+            warn!("failed to extract identity from oauth token: missing jwt payload segment");
+            return None;
+        }
+    };
+    let bytes = match URL_SAFE_NO_PAD.decode(payload) {
+        Ok(bytes) => bytes,
+        Err(error) => {
+            warn!(%error, "failed to extract identity from oauth token: invalid base64 payload");
+            return None;
+        }
+    };
+    let value = match serde_json::from_slice::<Value>(&bytes) {
+        Ok(value) => value,
+        Err(error) => {
+            warn!(%error, "failed to extract identity from oauth token: invalid json payload");
+            return None;
+        }
+    };
 
     let object = value.as_object()?;
     let user_id = object.get("sub").and_then(Value::as_str)?.trim();
     let email = object.get("email").and_then(Value::as_str)?.trim();
     if user_id.is_empty() || email.is_empty() {
+        warn!("failed to extract identity from oauth token: empty sub or email claim");
         return None;
     }
 
@@ -116,8 +138,13 @@ fn identity_from_jwt(auth: &StoredAuth) -> Option<CachedIdentity> {
 
 /// Get the identity from the backend
 async fn identity_from_api(client: &ApiClient) -> Option<CachedIdentity> {
-    // TODO: log error
-    let identity_response = client.get_identity().await.ok()?;
+    let identity_response = match client.get_identity().await {
+        Ok(identity_response) => identity_response,
+        Err(error) => {
+            warn!(%error, "failed to fetch identity from backend");
+            return None;
+        }
+    };
     let IdentityResponse { user_id, email } = identity_response;
 
     Some(CachedIdentity::new(user_id, email))

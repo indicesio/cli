@@ -1,3 +1,4 @@
+mod analytics;
 mod cli;
 mod client;
 mod commands;
@@ -9,6 +10,7 @@ mod output;
 use clap::Parser;
 use serde_json::Value;
 
+use crate::analytics::Analytics;
 use crate::cli::{Cli, Command};
 use crate::client::{ApiClient, ClientOptions};
 use crate::commands::auth::WhoamiOutput;
@@ -25,6 +27,7 @@ async fn main() {
     match run().await {
         Ok(()) => {}
         Err(CliError::Clap(error)) => {
+            // TODO: telemetry?
             let code = error.exit_code();
             let _ = error.print();
             std::process::exit(code);
@@ -37,59 +40,98 @@ async fn main() {
 }
 
 async fn run() -> Result<(), CliError> {
+    tracing_subscriber::fmt::init();
+
     let argv: Vec<String> = std::env::args().collect();
     if argv.len() == 2 && argv[1] == "--version" {
         println!("Indices CLI v{}", env!("CARGO_PKG_VERSION"));
         return Ok(());
     }
 
-    let cli = Cli::parse();
+    let cli = Cli::try_parse_from(argv.clone())?;
+    let analytics = Analytics::new().await;
+    let mut telemetry = analytics.build_context(&cli, &argv);
 
     let mut config_store = ConfigStore::load()?;
-
     let overrides = RuntimeOverrides {
         api_base: cli.api_base.as_deref(),
         timeout_seconds: cli.timeout,
     };
 
+    let result = execute_command(
+        &analytics,
+        &mut telemetry,
+        &mut config_store,
+        &overrides,
+        &cli,
+    )
+    .await;
+    analytics
+        .capture_command_end(&telemetry, result.is_ok(), exit_code_for_result(&result))
+        .await;
+    result
+}
+
+async fn execute_command(
+    analytics: &Analytics,
+    telemetry: &mut analytics::CommandTelemetryContext,
+    config_store: &mut ConfigStore,
+    overrides: &RuntimeOverrides<'_>,
+    cli: &Cli,
+) -> Result<(), CliError> {
     match &cli.command {
         Command::Login(args) => {
-            let runtime = config_store.resolve_runtime(&overrides)?;
-            commands::auth::login(&mut config_store, runtime, args).await?;
-            return Ok(());
+            let runtime = config_store.resolve_runtime(overrides)?;
+            analytics.capture_command_start(telemetry).await;
+            commands::auth::login(config_store, runtime, args).await?;
+            Ok(())
         }
         Command::Logout => {
-            commands::auth::logout(&mut config_store)?;
-            return Ok(());
+            analytics.capture_command_start(telemetry).await;
+            commands::auth::logout(config_store)?;
+            Ok(())
         }
-        _ => {}
-    }
+        _ => {
+            let runtime = config_store.resolve_runtime(overrides)?;
+            let mut session = runtime.auth.clone().ok_or(CliError::NotAuthenticated)?;
+            refresh_auth_if_needed(config_store, &runtime, &mut session, false).await?;
 
-    let runtime = config_store.resolve_runtime(&overrides)?;
-    let mut session = runtime.auth.clone().ok_or(CliError::NotAuthenticated)?;
-    refresh_auth_if_needed(&mut config_store, &runtime, &mut session, false).await?;
+            let mut client = build_client(&runtime, &session)?;
+            analytics
+                .identify_authenticated_user(telemetry, &session)
+                .await;
+            telemetry.is_authenticated = true;
+            analytics.capture_command_start(telemetry).await;
 
-    let mut client = build_client(&runtime, &session)?;
-    let response = match execute_authenticated_command(&cli.command, &client).await {
-        Ok(response) => response,
-        Err(CliError::Api(api_error)) if api_error.is_unauthorized() && session.is_oauth() => {
-            refresh_auth_if_needed(&mut config_store, &runtime, &mut session, true).await?;
-            client = build_client(&runtime, &session)?;
-            execute_authenticated_command(&cli.command, &client).await?
+            let response = match execute_authenticated_command(&cli.command, &client).await {
+                Ok(response) => response,
+                Err(CliError::Api(api_error))
+                    if api_error.is_unauthorized() && session.is_oauth() =>
+                {
+                    // TODO: Cleaner / recursive way of expressing this?
+                    // as we're just repeating the above.
+                    refresh_auth_if_needed(config_store, &runtime, &mut session, true).await?;
+                    client = build_client(&runtime, &session)?;
+                    analytics
+                        .identify_authenticated_user(telemetry, &session)
+                        .await;
+                    execute_authenticated_command(&cli.command, &client).await?
+                }
+                Err(e) => return Err(e),
+            };
+
+            let output_mode = if cli.json {
+                OutputMode::Json
+            } else {
+                OutputMode::Markdown
+            };
+            match response {
+                CommandResponse::Value(value) => output::print_response(&value, output_mode)?,
+                CommandResponse::Whoami(output) => output::print_whoami(&output, output_mode)?,
+            }
+            Ok(())
         }
-        Err(error) => return Err(error),
-    };
-
-    let output_mode = if cli.json {
-        OutputMode::Json
-    } else {
-        OutputMode::Markdown
-    };
-    match response {
-        CommandResponse::Value(value) => output::print_response(&value, output_mode)?,
-        CommandResponse::Whoami(output) => output::print_whoami(&output, output_mode)?,
     }
-    Ok(())
 }
 
 fn build_client(runtime: &RuntimeConfig, session: &StoredSession) -> Result<ApiClient, CliError> {
@@ -144,5 +186,12 @@ async fn execute_authenticated_command(
         Command::Login(_) | Command::Logout => {
             Err(CliError::Message("unexpected command routing".to_string()))
         }
+    }
+}
+
+fn exit_code_for_result(result: &Result<(), CliError>) -> i32 {
+    match result {
+        Ok(()) => 0,
+        Err(error) => error.exit_code(),
     }
 }
