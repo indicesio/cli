@@ -4,7 +4,7 @@ use serde::Serialize;
 use serde_json::Value;
 
 use crate::cli::LoginArgs;
-use crate::client::{ApiClient, ClientOptions, MeResponse};
+use crate::client::{ApiClient, ClientOptions, IdentityResponse};
 use crate::config::{ConfigStore, RuntimeConfig, StoredAuth};
 use crate::errors::CliError;
 use crate::oauth;
@@ -44,7 +44,7 @@ pub async fn login(
             timeout_seconds: runtime.timeout_seconds,
         })?;
 
-        client.get_me().await.map_err(|error| {
+        client.get_identity().await.map_err(|error| {
             CliError::Message(format!("authentication verification failed: {error}"))
         })?;
     }
@@ -77,7 +77,7 @@ pub fn logout(config_store: &mut ConfigStore) -> Result<(), CliError> {
 }
 
 pub async fn whoami(client: &ApiClient) -> Result<WhoamiOutput, CliError> {
-    let MeResponse { user_id, email } = client.get_me().await?;
+    let IdentityResponse { user_id, email } = client.get_identity().await?;
 
     Ok(WhoamiOutput { user_id, email })
 }
