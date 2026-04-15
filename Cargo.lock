@@ -737,6 +737,7 @@ dependencies = [
 name = "indices-cli"
 version = "0.0.6"
 dependencies = [
+ "base64",
  "chrono",
  "clap",
  "directories",

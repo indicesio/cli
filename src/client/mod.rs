@@ -27,8 +27,8 @@ pub struct ApiClient {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IdentityResponse {
-    pub user_id: Value,
-    pub email: Option<String>,
+    pub user_id: String,
+    pub email: String,
 }
 
 #[derive(Debug, Error)]
@@ -119,9 +119,8 @@ impl ApiClient {
             return Err(http_error_from_bytes(status, &bytes));
         }
 
-        serde_json::from_slice::<IdentityResponse>(&bytes).map_err(|error| {
-            ApiError::Serialization(format!("invalid response payload: {error}"))
-        })
+        serde_json::from_slice::<IdentityResponse>(&bytes)
+            .map_err(|error| ApiError::Serialization(format!("invalid response payload: {error}")))
     }
 
     pub async fn create_task(&self, body: Value) -> Result<Value, ApiError> {

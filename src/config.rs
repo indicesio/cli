@@ -23,7 +23,7 @@ pub enum OutputMode {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConfigFile {
     pub api_base: Option<String>,
-    pub auth: Option<StoredAuth>,
+    pub auth: Option<StoredSession>,
     pub timeout_seconds: Option<u64>,
 }
 
@@ -38,11 +38,46 @@ impl Default for ConfigFile {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct StoredSession {
+    #[serde(flatten)]
+    pub auth: StoredAuth,
+    pub identity: Option<CachedIdentity>,
+}
+
+impl StoredSession {
+    pub fn bearer_token(&self) -> &str {
+        self.auth.bearer_token()
+    }
+
+    pub fn is_oauth(&self) -> bool {
+        self.auth.is_oauth()
+    }
+
+    pub fn cached_identity(&self) -> Option<&CachedIdentity> {
+        self.identity.as_ref()
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct CachedIdentity {
+    pub user_id: String,
+    pub email: String,
+}
+
+impl CachedIdentity {
+    pub fn new(user_id: String, email: String) -> Self {
+        Self { user_id, email }
+    }
+}
+
+// TODO: perhaps `Credentials` is a better term for this now?
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "method", rename_all = "snake_case")]
 pub enum StoredAuth {
     ApiKey {
         api_key: String,
     },
+    #[serde(rename = "oauth")]
     OAuth {
         access_token: String,
         refresh_token: String,
@@ -83,7 +118,7 @@ pub enum ConfigError {
 #[derive(Debug, Clone)]
 pub struct RuntimeConfig {
     pub api_base: String,
-    pub auth: Option<StoredAuth>,
+    pub auth: Option<StoredSession>,
     pub timeout_seconds: u64,
 }
 
@@ -148,13 +183,13 @@ impl ConfigStore {
         })
     }
 
-    pub fn set_auth(
+    pub fn set_session(
         &mut self,
-        auth: StoredAuth,
+        session: StoredSession,
         api_base: Option<&str>,
         timeout_seconds: Option<u64>,
     ) -> Result<(), ConfigError> {
-        self.data.auth = Some(auth);
+        self.data.auth = Some(session);
 
         if let Some(api_base) = api_base {
             self.data.api_base = Some(api_base.to_string());
@@ -249,6 +284,7 @@ fn write_config(path: &PathBuf, bytes: &[u8]) -> Result<(), ConfigError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::TimeZone;
 
     #[test]
     fn config_default_has_single_auth_shape() {
@@ -273,5 +309,80 @@ mod tests {
 
         assert_eq!(runtime.api_base, DEFAULT_API_BASE);
         assert_eq!(runtime.timeout_seconds, DEFAULT_TIMEOUT_SECONDS);
+    }
+
+    #[test]
+    fn serializes_api_key_session_with_identity() {
+        let config = ConfigFile {
+            api_base: Some(DEFAULT_API_BASE.to_string()),
+            auth: Some(StoredSession {
+                auth: StoredAuth::ApiKey {
+                    api_key: "idx_test".to_string(),
+                },
+                identity: Some(CachedIdentity {
+                    user_id: "user_123".to_string(),
+                    email: "user@example.com".to_string(),
+                }),
+            }),
+            timeout_seconds: Some(DEFAULT_TIMEOUT_SECONDS),
+        };
+
+        let rendered = toml::to_string(&config).expect("config should serialize");
+
+        assert_eq!(
+            rendered,
+            r#"api_base = "https://api.indices.io"
+timeout_seconds = 30
+
+[auth]
+method = "api_key"
+api_key = "idx_test"
+
+[auth.identity]
+user_id = "user_123"
+email = "user@example.com"
+"#
+        );
+    }
+
+    #[test]
+    fn serializes_oauth_session_with_identity() {
+        let config = ConfigFile {
+            api_base: Some(DEFAULT_API_BASE.to_string()),
+            auth: Some(StoredSession {
+                auth: StoredAuth::OAuth {
+                    access_token: "access".to_string(),
+                    refresh_token: "refresh".to_string(),
+                    expires_at: Utc
+                        .with_ymd_and_hms(2026, 4, 15, 12, 0, 0)
+                        .single()
+                        .expect("timestamp should be valid"),
+                },
+                identity: Some(CachedIdentity {
+                    user_id: "user_456".to_string(),
+                    email: "oauth@example.com".to_string(),
+                }),
+            }),
+            timeout_seconds: Some(DEFAULT_TIMEOUT_SECONDS),
+        };
+
+        let rendered = toml::to_string(&config).expect("config should serialize");
+
+        assert_eq!(
+            rendered,
+            r#"api_base = "https://api.indices.io"
+timeout_seconds = 30
+
+[auth]
+method = "oauth"
+access_token = "access"
+refresh_token = "refresh"
+expires_at = "2026-04-15T12:00:00Z"
+
+[auth.identity]
+user_id = "user_456"
+email = "oauth@example.com"
+"#
+        );
     }
 }

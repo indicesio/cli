@@ -1,8 +1,8 @@
 use serde_json::{Map, Value};
 
+use crate::commands::auth::WhoamiOutput;
 use crate::config::OutputMode;
 use crate::errors::CliError;
-use crate::commands::auth::WhoamiOutput;
 
 const PRIORITY_KEYS: &[&str] = &[
     "id",
@@ -224,11 +224,10 @@ fn print_whoami_pretty(output: &WhoamiOutput) {
 
     println!("{GREEN}✔{RESET} You are logged in to Indices");
 
-    let mut rows = Vec::new();
-    if let Some(email) = &output.email {
-        rows.push(("Email", email.clone()));
-    }
-    rows.push(("User ID", stringify_value(&output.user_id)));
+    let rows = vec![
+        ("Email", output.email.clone()),
+        ("User ID", output.user_id.clone()),
+    ];
 
     let width = rows.iter().map(|(label, _)| label.len()).max().unwrap_or(0);
     for (label, value) in rows {
