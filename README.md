@@ -83,7 +83,9 @@ The installer verifies downloaded binaries against the checksum file.
 
 See [RELEASING.md](RELEASING.md) for the release process.
 
-## Regenerate OpenAPI schema snapshot
+## Refresh OpenAPI schema snapshot
+
+`openapi/openapi.json` is a committed snapshot of the production schema. CI verifies that this snapshot is up-to-date with production.
 
 ```bash
 make generate-client

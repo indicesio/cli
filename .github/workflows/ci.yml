@@ -18,6 +18,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Verify OpenAPI schema snapshot is up to date
+        shell: bash
+        run: |
+          set -euo pipefail
+          make generate-client
+
+          if ! git diff --exit-code -- openapi/openapi.json; then
+            echo "openapi/openapi.json is out of date with production." >&2
+            echo "Run 'make generate-client' and commit the updated snapshot." >&2
+            exit 1
+          fi
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
