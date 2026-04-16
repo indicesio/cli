@@ -1,4 +1,4 @@
-# indices-cli
+# Indices CLI
 
 A CLI interface for the Indices API.
 
@@ -10,8 +10,11 @@ A CLI interface for the Indices API.
 curl -fsSL https://indices.io/install.sh | sh
 ```
 
-You can customise the install command, if you wish:
+<details>
 
+<summary>Advanced install flags</summary>
+
+You can customise the install command, if you wish:
 
 ```bash
 # Install a specific version:
@@ -20,6 +23,8 @@ curl -fsSL https://indices.io/install.sh | sh -s -- --version 0.1.0
 # Install to a custom directory:
 curl -fsSL https://indices.io/install.sh | sh -s -- --install-dir /usr/local/bin --yes
 ```
+
+</details>
 
 ### Windows
 
