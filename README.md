@@ -7,7 +7,7 @@ A CLI interface for the Indices API.
 ### macOS and Linux
 
 ```bash
-curl -fsSL https://indices.io/install.sh | sh
+curl -fsSL https://get.indices.io | sh
 ```
 
 <details>
@@ -18,10 +18,10 @@ You can customise the install command, if you wish:
 
 ```bash
 # Install a specific version:
-curl -fsSL https://indices.io/install.sh | sh -s -- --version 0.1.0
+curl -fsSL https://get.indices.io | sh -s -- --version 0.1.0
 
 # Install to a custom directory:
-curl -fsSL https://indices.io/install.sh | sh -s -- --install-dir /usr/local/bin --yes
+curl -fsSL https://get.indices.io | sh -s -- --install-dir /usr/local/bin --yes
 ```
 
 </details>
