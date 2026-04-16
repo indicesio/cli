@@ -1,7 +1,7 @@
 use std::fs;
 use std::io;
 use std::io::Write;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, Utc};
 use directories::BaseDirs;
@@ -241,11 +241,11 @@ fn base_config_dir() -> Result<PathBuf, ConfigError> {
     Ok(dirs.config_dir().join("indices"))
 }
 
-fn write_config(path: &PathBuf, bytes: &[u8]) -> Result<(), ConfigError> {
+fn write_config(path: &Path, bytes: &[u8]) -> Result<(), ConfigError> {
     #[cfg(unix)]
     {
         use std::fs::OpenOptions;
-        use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+        use std::os::unix::fs::OpenOptionsExt;
 
         let mut file = OpenOptions::new()
             .create(true)
@@ -259,12 +259,6 @@ fn write_config(path: &PathBuf, bytes: &[u8]) -> Result<(), ConfigError> {
             })?;
 
         file.write_all(bytes).map_err(|source| ConfigError::Write {
-            path: path.display().to_string(),
-            source,
-        })?;
-
-        let permissions = fs::Permissions::from_mode(0o600);
-        fs::set_permissions(path, permissions).map_err(|source| ConfigError::Write {
             path: path.display().to_string(),
             source,
         })?;

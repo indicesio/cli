@@ -13,7 +13,7 @@ pub async fn handle_secrets_command(
 ) -> Result<Value, CliError> {
     match command {
         SecretsCommand::Create(args) => create_secret(client, args).await,
-        SecretsCommand::List => client.list_secrets().await.map_err(Into::into),
+        SecretsCommand::List => Ok(client.list_secrets().await?),
         SecretsCommand::Delete(DeleteSecretArgs { uuid, yes }) => {
             delete_secret(client, uuid, *yes).await
         }
@@ -29,8 +29,7 @@ async fn create_secret(client: &ApiClient, args: &CreateSecretArgs) -> Result<Va
         ));
     }
 
-    let response = client.create_secret(&args.name, &value).await?;
-    Ok(response)
+    Ok(client.create_secret(&args.name, &value).await?)
 }
 
 async fn delete_secret(client: &ApiClient, uuid: &str, yes: bool) -> Result<Value, CliError> {
@@ -45,7 +44,7 @@ async fn delete_secret(client: &ApiClient, uuid: &str, yes: bool) -> Result<Valu
         }
     }
 
-    client.delete_secret(uuid).await.map_err(Into::into)
+    Ok(client.delete_secret(uuid).await?)
 }
 
 fn secret_value(args: &CreateSecretArgs) -> Result<String, CliError> {

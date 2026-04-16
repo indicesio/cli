@@ -16,20 +16,17 @@ pub async fn handle_runs_command(
 ) -> Result<Value, CliError> {
     match command {
         RunsCommand::Create(args) => create_run(client, args).await,
-        RunsCommand::List(args) => client
+        RunsCommand::List(args) => Ok(client
             .list_runs(Some(&args.task_id), args.limit, args.cursor.as_deref())
-            .await
-            .map_err(Into::into),
-        RunsCommand::Get(RunIdArgs { run_id }) => client.get_run(run_id).await.map_err(Into::into),
-        RunsCommand::Logs(RunIdArgs { run_id }) => {
-            client.get_run_logs(run_id).await.map_err(Into::into)
-        }
+            .await?),
+        RunsCommand::Get(RunIdArgs { run_id }) => Ok(client.get_run(run_id).await?),
+        RunsCommand::Logs(RunIdArgs { run_id }) => Ok(client.get_run_logs(run_id).await?),
     }
 }
 
 async fn create_run(client: &ApiClient, args: &CreateRunArgs) -> Result<Value, CliError> {
     let body = load_create_run_payload(args)?;
-    client.create_run(body).await.map_err(Into::into)
+    Ok(client.create_run(body).await?)
 }
 
 fn load_create_run_payload(args: &CreateRunArgs) -> Result<Value, CliError> {

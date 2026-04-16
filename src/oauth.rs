@@ -1,5 +1,4 @@
 use std::process::Command;
-use std::thread;
 use std::time::{Duration, Instant};
 
 use chrono::{Duration as ChronoDuration, Utc};
@@ -50,7 +49,7 @@ struct OAuthErrorResponse {
 }
 
 pub async fn login_with_oauth(timeout_seconds: u64) -> Result<StoredAuth, CliError> {
-    let config = auth_client_config()?;
+    let config = auth_client_config();
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(timeout_seconds))
         .build()?;
@@ -91,7 +90,7 @@ pub async fn refresh_auth(
         return Ok(None);
     }
 
-    let config = auth_client_config()?;
+    let config = auth_client_config();
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(timeout_seconds))
         .build()?;
@@ -115,11 +114,11 @@ pub async fn refresh_auth(
         .map(Some)
 }
 
-fn auth_client_config() -> Result<OAuthClientConfig, CliError> {
-    Ok(OAuthClientConfig {
+fn auth_client_config() -> OAuthClientConfig {
+    OAuthClientConfig {
         base_url: OAUTH_BASE_URL.to_string(),
         client_id: OAUTH_CLIENT_ID.to_string(),
-    })
+    }
 }
 
 async fn request_device_code(
@@ -257,16 +256,21 @@ fn print_login_instructions(device: &DeviceAuthorizationResponse) {
 }
 
 fn open_browser(url: &str) -> bool {
-    if cfg!(target_os = "macos") {
+    #[cfg(target_os = "macos")]
+    {
         return Command::new("open").arg(url).spawn().is_ok();
     }
 
-    if cfg!(target_os = "windows") {
+    #[cfg(target_os = "windows")]
+    {
         return Command::new("cmd")
             .args(["/C", "start", "", url])
             .spawn()
             .is_ok();
     }
 
-    Command::new("xdg-open").arg(url).spawn().is_ok()
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    {
+        Command::new("xdg-open").arg(url).spawn().is_ok()
+    }
 }

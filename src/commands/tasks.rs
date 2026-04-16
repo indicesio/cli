@@ -15,29 +15,23 @@ pub async fn handle_tasks_command(
 ) -> Result<Value, CliError> {
     match command {
         TasksCommand::Create(args) => create_task(client, args).await,
-        TasksCommand::Get(TaskIdArgs { task_id }) => {
-            client.get_task(task_id).await.map_err(Into::into)
-        }
-        TasksCommand::List(args) => client
+        TasksCommand::Get(TaskIdArgs { task_id }) => Ok(client.get_task(task_id).await?),
+        TasksCommand::List(args) => Ok(client
             .list_tasks(args.status.as_deref(), args.limit, args.cursor.as_deref())
-            .await
-            .map_err(Into::into),
+            .await?),
         TasksCommand::Delete(DeleteTaskArgs { task_id, yes }) => {
             delete_task(client, task_id, *yes).await
         }
-        TasksCommand::Retry(TaskIdArgs { task_id }) => {
-            client.retry_task(task_id).await.map_err(Into::into)
+        TasksCommand::Retry(TaskIdArgs { task_id }) => Ok(client.retry_task(task_id).await?),
+        TasksCommand::RegenerateApi(TaskIdArgs { task_id }) => {
+            Ok(client.regenerate_task_api(task_id).await?)
         }
-        TasksCommand::RegenerateApi(TaskIdArgs { task_id }) => client
-            .regenerate_task_api(task_id)
-            .await
-            .map_err(Into::into),
     }
 }
 
 async fn create_task(client: &ApiClient, args: &CreateTaskArgs) -> Result<Value, CliError> {
     let body = load_create_task_payload(args)?;
-    client.create_task(body).await.map_err(Into::into)
+    Ok(client.create_task(body).await?)
 }
 
 async fn delete_task(client: &ApiClient, task_id: &str, yes: bool) -> Result<Value, CliError> {
@@ -123,6 +117,7 @@ fn build_task_payload_from_args(args: &CreateTaskArgs) -> Result<Value, CliError
     payload.insert("website".to_string(), Value::String(website));
     payload.insert("task".to_string(), Value::String(task));
 
+    // Schemas are sent as JSON-encoded strings, not objects — the API expects them this way.
     if let Some(input_schema) = &args.input_schema {
         payload.insert(
             "input_schema".to_string(),
