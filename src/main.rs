@@ -6,9 +6,11 @@ mod config;
 mod errors;
 mod oauth;
 mod output;
+mod telemetry;
 
 use clap::Parser;
 use serde_json::Value;
+use tracing::instrument;
 
 use crate::analytics::Analytics;
 use crate::cli::{Cli, Command};
@@ -24,10 +26,14 @@ enum CommandResponse {
 
 #[tokio::main]
 async fn main() {
-    match run().await {
+    let _telemetry = telemetry::init();
+    let result = run().await;
+    // Force a flush of telemetry traces before we return
+    drop(_telemetry);
+
+    match result {
         Ok(()) => {}
         Err(CliError::Clap(error)) => {
-            // TODO: telemetry?
             let code = error.exit_code();
             let _ = error.print();
             std::process::exit(code);
@@ -39,9 +45,8 @@ async fn main() {
     }
 }
 
+#[instrument(name = "cli.run", skip_all, err)]
 async fn run() -> Result<(), CliError> {
-    tracing_subscriber::fmt::init();
-
     let argv: Vec<String> = std::env::args().collect();
     if argv.len() == 2 && argv[1] == "--version" {
         println!("Indices CLI v{}", env!("CARGO_PKG_VERSION"));
@@ -72,6 +77,7 @@ async fn run() -> Result<(), CliError> {
     result
 }
 
+#[instrument(name = "cli.command", skip_all, err)]
 async fn execute_command(
     analytics: &Analytics,
     telemetry: &mut analytics::CommandTelemetryContext,
@@ -142,6 +148,7 @@ fn build_client(runtime: &RuntimeConfig, session: &StoredSession) -> Result<ApiC
     })?)
 }
 
+#[instrument(name = "cli.refresh_auth", skip_all, fields(force), err)]
 async fn refresh_auth_if_needed(
     config_store: &mut ConfigStore,
     runtime: &RuntimeConfig,

@@ -8,7 +8,10 @@ use reqwest::header::{ACCEPT, AUTHORIZATION, HeaderMap, HeaderName, HeaderValue}
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use thiserror::Error;
+use tracing::instrument;
 use uuid::Uuid;
+
+use crate::telemetry;
 
 const REQUEST_SOURCE_HEADER: &str = "x-indices-request-source";
 const REQUEST_SOURCE_CLI: &str = "cli";
@@ -99,11 +102,16 @@ impl ApiClient {
         })
     }
 
+    #[instrument(name = "cli.api.get_identity", skip_all, err)]
     pub async fn get_identity(&self) -> Result<IdentityResponse, ApiError> {
+        let mut headers = HeaderMap::new();
+        telemetry::inject_trace_context(&mut headers);
+
         let response = self
             .inner
             .client
             .get(format!("{}/v1beta/identity", self.inner.baseurl))
+            .headers(headers)
             .header(ACCEPT, "application/json")
             .header(
                 "api-version",
@@ -123,6 +131,7 @@ impl ApiClient {
             .map_err(|error| ApiError::Serialization(format!("invalid response payload: {error}")))
     }
 
+    #[instrument(name = "cli.api.create_task", skip_all, err)]
     pub async fn create_task(&self, body: Value) -> Result<Value, ApiError> {
         let request = serde_json::from_value::<generated::types::CreateTaskRequest>(body).map_err(
             |error| ApiError::InvalidArgument(format!("invalid create-task payload: {error}")),
@@ -138,6 +147,7 @@ impl ApiClient {
         to_json_value(response)
     }
 
+    #[instrument(name = "cli.api.get_task", skip_all, fields(task_id), err)]
     pub async fn get_task(&self, task_id: &str) -> Result<Value, ApiError> {
         let task_id = parse_uuid(task_id, "task_id")?;
         let response = self
@@ -150,6 +160,7 @@ impl ApiClient {
         to_json_value(response)
     }
 
+    #[instrument(name = "cli.api.list_tasks", skip_all, fields(status, limit), err)]
     pub async fn list_tasks(
         &self,
         status: Option<&str>,
@@ -186,6 +197,7 @@ impl ApiClient {
         to_json_value(tasks)
     }
 
+    #[instrument(name = "cli.api.delete_task", skip_all, fields(task_id), err)]
     pub async fn delete_task(&self, task_id: &str) -> Result<Value, ApiError> {
         let task_id = parse_uuid(task_id, "task_id")?;
         let response = self
@@ -198,6 +210,7 @@ impl ApiClient {
         to_json_value(response)
     }
 
+    #[instrument(name = "cli.api.retry_task", skip_all, fields(task_id), err)]
     pub async fn retry_task(&self, task_id: &str) -> Result<Value, ApiError> {
         let task_id = parse_uuid(task_id, "task_id")?;
         let response = self
@@ -210,6 +223,7 @@ impl ApiClient {
         to_json_value(response)
     }
 
+    #[instrument(name = "cli.api.regenerate_task", skip_all, fields(task_id), err)]
     pub async fn regenerate_task_api(&self, task_id: &str) -> Result<Value, ApiError> {
         let task_id = parse_uuid(task_id, "task_id")?;
         let response = self
@@ -222,6 +236,7 @@ impl ApiClient {
         to_json_value(response)
     }
 
+    #[instrument(name = "cli.api.list_runs", skip_all, fields(task_id, limit), err)]
     pub async fn list_runs(
         &self,
         task_id: Option<&str>,
@@ -256,6 +271,7 @@ impl ApiClient {
         to_json_value(runs)
     }
 
+    #[instrument(name = "cli.api.create_run", skip_all, err)]
     pub async fn create_run(&self, body: Value) -> Result<Value, ApiError> {
         let request = serde_json::from_value::<generated::types::CreateRunRequest>(body).map_err(
             |error| ApiError::InvalidArgument(format!("invalid create-run payload: {error}")),
@@ -263,10 +279,14 @@ impl ApiClient {
 
         // Handle runs.create manually so undocumented 4xx responses and schema-drift
         // in error payloads still surface the backend's actual message.
+        let mut trace_headers = HeaderMap::new();
+        telemetry::inject_trace_context(&mut trace_headers);
+
         let response = self
             .inner
             .client
             .post(format!("{}/v1beta/runs", self.inner.baseurl))
+            .headers(trace_headers)
             .header(reqwest::header::ACCEPT, "application/json")
             .header(
                 "api-version",
@@ -290,6 +310,7 @@ impl ApiClient {
         to_json_value(run)
     }
 
+    #[instrument(name = "cli.api.get_run", skip_all, fields(run_id), err)]
     pub async fn get_run(&self, run_id: &str) -> Result<Value, ApiError> {
         let run_id = parse_uuid(run_id, "run_id")?;
         let response = self
@@ -302,6 +323,7 @@ impl ApiClient {
         to_json_value(response)
     }
 
+    #[instrument(name = "cli.api.get_run_logs", skip_all, fields(run_id), err)]
     pub async fn get_run_logs(&self, run_id: &str) -> Result<Value, ApiError> {
         let run_id = parse_uuid(run_id, "run_id")?;
         let response = self
@@ -314,6 +336,7 @@ impl ApiClient {
         to_json_value(response)
     }
 
+    #[instrument(name = "cli.api.create_secret", skip_all, fields(name), err)]
     pub async fn create_secret(&self, name: &str, value: &str) -> Result<Value, ApiError> {
         let request = generated::types::CreateSecretRequest {
             name: name.to_string(),
@@ -335,6 +358,7 @@ impl ApiClient {
         to_json_value(response)
     }
 
+    #[instrument(name = "cli.api.list_secrets", skip_all, err)]
     pub async fn list_secrets(&self) -> Result<Value, ApiError> {
         let response = self
             .inner
@@ -346,6 +370,7 @@ impl ApiClient {
         to_json_value(response)
     }
 
+    #[instrument(name = "cli.api.delete_secret", skip_all, fields(uuid), err)]
     pub async fn delete_secret(&self, uuid: &str) -> Result<Value, ApiError> {
         let uuid = parse_uuid(uuid, "uuid")?;
         let response = self

@@ -6,6 +6,8 @@ use chrono::{Duration as ChronoDuration, Utc};
 use reqwest::StatusCode;
 use serde::Deserialize;
 
+use tracing::instrument;
+
 use crate::config::StoredAuth;
 use crate::errors::CliError;
 
@@ -70,6 +72,7 @@ pub async fn login_with_oauth(timeout_seconds: u64) -> Result<StoredAuth, CliErr
     poll_for_device_tokens(&client, &config, &device).await
 }
 
+#[instrument(name = "cli.oauth_refresh", skip_all, fields(force), err)]
 pub async fn refresh_auth(
     auth: &StoredAuth,
     timeout_seconds: u64,
