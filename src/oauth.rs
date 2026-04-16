@@ -160,7 +160,7 @@ async fn poll_for_device_tokens(
             ));
         }
 
-        thread::sleep(Duration::from_secs(interval_seconds));
+        tokio::time::sleep(Duration::from_secs(interval_seconds)).await;
 
         let response = client
             .post(format!(
