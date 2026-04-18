@@ -149,9 +149,7 @@ pub fn inject_trace_context(headers: &mut reqwest::header::HeaderMap) {
     use opentelemetry::trace::TraceContextExt;
     let span_context = context.span().span_context().clone();
     if span_context.is_valid() {
-        if let Ok(val) =
-            reqwest::header::HeaderValue::from_str(&to_sentry_trace(&span_context))
-        {
+        if let Ok(val) = reqwest::header::HeaderValue::from_str(&to_sentry_trace(&span_context)) {
             headers.insert("sentry-trace", val);
         }
     }
