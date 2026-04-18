@@ -375,7 +375,7 @@ impl ApiClient {
         let uuid = parse_uuid(uuid, "uuid")?;
         let response = self
             .inner
-            .delete_user_secret_v1beta_secrets_uuid_delete(&uuid)
+            .delete_user_secret_v1beta_secrets_id_delete(&uuid)
             .await
             .map_err(map_generated_error)?
             .into_inner();
