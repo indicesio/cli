@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use opentelemetry::global;
 use opentelemetry::propagation::Injector;
-use opentelemetry::trace::TracerProvider;
+use opentelemetry::trace::{SpanContext, TracerProvider};
 use opentelemetry_appender_tracing::layer::OpenTelemetryTracingBridge;
 use opentelemetry_otlp::WithExportConfig;
 use opentelemetry_otlp::WithHttpConfig;
@@ -125,10 +125,34 @@ impl Injector for HeaderInjector<'_> {
     }
 }
 
-/// Injects the current trace context (traceparent/tracestate) into the given headers.
+/// Formats a `SpanContext` into a `sentry-trace` header value: `{trace_id}-{span_id}-{sampled}`.
+fn to_sentry_trace(span_context: &SpanContext) -> String {
+    let trace_id = span_context.trace_id();
+    let span_id = span_context.span_id();
+    let sampled = if span_context.trace_flags().is_sampled() {
+        '1'
+    } else {
+        '0'
+    };
+    format!("{trace_id}-{span_id}-{sampled}")
+}
+
+/// Injects Sentry distributed-tracing headers (`sentry-trace`, `baggage`) into the given headers.
 pub fn inject_trace_context(headers: &mut reqwest::header::HeaderMap) {
     let context = tracing_opentelemetry::OpenTelemetrySpanExt::context(&tracing::Span::current());
+    // Inject baggage via the global propagator (passes through any incoming baggage as-is).
     global::get_text_map_propagator(|propagator| {
         propagator.inject_context(&context, &mut HeaderInjector(headers));
     });
+
+    // Add Sentry's `sentry-trace` header for distributed tracing.
+    use opentelemetry::trace::TraceContextExt;
+    let span_context = context.span().span_context().clone();
+    if span_context.is_valid() {
+        if let Ok(val) =
+            reqwest::header::HeaderValue::from_str(&to_sentry_trace(&span_context))
+        {
+            headers.insert("sentry-trace", val);
+        }
+    }
 }
