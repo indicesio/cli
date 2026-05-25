@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use opentelemetry::global;
 use opentelemetry::propagation::Injector;
-use opentelemetry::trace::{SpanContext, TracerProvider};
+use opentelemetry::trace::TracerProvider;
 use opentelemetry_appender_tracing::layer::OpenTelemetryTracingBridge;
 use opentelemetry_otlp::WithExportConfig;
 use opentelemetry_otlp::WithHttpConfig;
@@ -17,11 +17,9 @@ use tracing_subscriber::filter::Targets;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
-const SENTRY_TRACES_ENDPOINT: &str =
-    "https://o109117.ingest.us.sentry.io/api/4511226766753792/integration/otlp/v1/traces";
-const SENTRY_LOGS_ENDPOINT: &str =
-    "https://o109117.ingest.us.sentry.io/api/4511226766753792/integration/otlp/v1/logs";
-const SENTRY_AUTH_HEADER: &str = "sentry sentry_key=f10de9b5dda3541c5373f8934aab1894";
+const OTEL_TRACES_ENDPOINT: &str = "https://goku.indices.io/v1/traces";
+const OTEL_LOGS_ENDPOINT: &str = "https://goku.indices.io/v1/logs";
+const OTEL_AUTH_HEADER: &str = "Bearer 5cCemZbe2Hbem64v7ND9yiX4fvkdnYslXXsFxrxj02PKvkKD";
 
 fn resource() -> Resource {
     Resource::builder()
@@ -36,10 +34,10 @@ fn resource() -> Resource {
 fn init_tracer_provider(resource: Resource) -> SdkTracerProvider {
     let exporter = opentelemetry_otlp::SpanExporter::builder()
         .with_http()
-        .with_endpoint(SENTRY_TRACES_ENDPOINT)
+        .with_endpoint(OTEL_TRACES_ENDPOINT)
         .with_headers(HashMap::from([(
-            "x-sentry-auth".to_string(),
-            SENTRY_AUTH_HEADER.to_string(),
+            "authorization".to_string(),
+            OTEL_AUTH_HEADER.to_string(),
         )]))
         .build()
         .expect("failed to build OTLP span exporter");
@@ -53,10 +51,10 @@ fn init_tracer_provider(resource: Resource) -> SdkTracerProvider {
 fn init_logger_provider(resource: Resource) -> SdkLoggerProvider {
     let exporter = opentelemetry_otlp::LogExporter::builder()
         .with_http()
-        .with_endpoint(SENTRY_LOGS_ENDPOINT)
+        .with_endpoint(OTEL_LOGS_ENDPOINT)
         .with_headers(HashMap::from([(
-            "x-sentry-auth".to_string(),
-            SENTRY_AUTH_HEADER.to_string(),
+            "authorization".to_string(),
+            OTEL_AUTH_HEADER.to_string(),
         )]))
         .build()
         .expect("failed to build OTLP log exporter");
@@ -125,32 +123,10 @@ impl Injector for HeaderInjector<'_> {
     }
 }
 
-/// Formats a `SpanContext` into a `sentry-trace` header value: `{trace_id}-{span_id}-{sampled}`.
-fn to_sentry_trace(span_context: &SpanContext) -> String {
-    let trace_id = span_context.trace_id();
-    let span_id = span_context.span_id();
-    let sampled = if span_context.trace_flags().is_sampled() {
-        '1'
-    } else {
-        '0'
-    };
-    format!("{trace_id}-{span_id}-{sampled}")
-}
-
-/// Injects Sentry distributed-tracing headers (`sentry-trace`, `baggage`) into the given headers.
+/// Injects the current trace context (traceparent/tracestate) into the given headers.
 pub fn inject_trace_context(headers: &mut reqwest::header::HeaderMap) {
     let context = tracing_opentelemetry::OpenTelemetrySpanExt::context(&tracing::Span::current());
-    // Inject baggage via the global propagator (passes through any incoming baggage as-is).
     global::get_text_map_propagator(|propagator| {
         propagator.inject_context(&context, &mut HeaderInjector(headers));
     });
-
-    // Add Sentry's `sentry-trace` header for distributed tracing.
-    use opentelemetry::trace::TraceContextExt;
-    let span_context = context.span().span_context().clone();
-    if span_context.is_valid() {
-        if let Ok(val) = reqwest::header::HeaderValue::from_str(&to_sentry_trace(&span_context)) {
-            headers.insert("sentry-trace", val);
-        }
-    }
 }
