@@ -34,6 +34,9 @@ curl -fsSL https://get.indices.io | sh -s -- --install-dir /usr/local/bin --yes
 
 ```bash
 cargo install --path .
+
+# With copy
+cargo install --path . && cp target/release/indices ~/.local/bin
 ```
 
 ## Commands
