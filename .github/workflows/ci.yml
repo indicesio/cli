@@ -10,13 +10,21 @@ permissions:
   contents: read
 
 jobs:
-  checks:
-    name: Format, test, build
+  lint:
+    name: Lint
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Cargo fmt
+        run: cargo fmt --check
 
       - name: Verify OpenAPI schema snapshot is up to date
         shell: bash
@@ -30,24 +38,24 @@ jobs:
             exit 1
           fi
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt
-
-      - name: Cache Rust
-        uses: Swatinem/rust-cache@v2
-
-      - name: Cargo fmt
-        run: cargo fmt --check
-
-      - name: Cargo test
-        run: cargo test --locked
-
-      - name: Cargo build
-        run: cargo build --locked
-
       - name: Validate installer script
         run: |
           sh -n install.sh
           shellcheck install.sh
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+
+      - name: Cargo test
+        run: cargo test --locked --all-targets
