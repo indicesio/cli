@@ -166,23 +166,6 @@ jobs:
           merge-multiple: true
           path: dist
 
-      - name: Ensure release tag exists
-        shell: bash
-        run: |
-          set -euo pipefail
-          tag="${{ needs.verify-version.outputs.tag }}"
-
-          git fetch --tags
-          if git rev-parse "refs/tags/${tag}" >/dev/null 2>&1; then
-            echo "Tag ${tag} already exists."
-            exit 0
-          fi
-
-          git config user.name "Indices CI"
-          git config user.email "ci@indices.io"
-          git tag "${tag}" "${GITHUB_SHA}"
-          git push origin "${tag}"
-
       - name: Generate checksums
         id: checksums
         shell: bash
