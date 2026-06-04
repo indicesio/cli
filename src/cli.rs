@@ -340,14 +340,14 @@ mod tests {
             "indices",
             "runs",
             "logs",
-            "11111111-1111-1111-1111-111111111111",
+            "run_0A1b2C3d4E5f6G7h8I9j0K",
         ]);
 
         assert!(matches!(
             cli.command,
             Command::Runs {
                 command: RunsCommand::Logs(RunIdArgs { ref run_id })
-            } if run_id == "11111111-1111-1111-1111-111111111111"
+            } if run_id == "run_0A1b2C3d4E5f6G7h8I9j0K"
         ));
     }
 

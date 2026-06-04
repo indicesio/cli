@@ -149,10 +149,9 @@ impl ApiClient {
 
     #[instrument(name = "cli.api.get_task", skip_all, fields(task_id), err)]
     pub async fn get_task(&self, task_id: &str) -> Result<Value, ApiError> {
-        let task_id = parse_uuid(task_id, "task_id")?;
         let response = self
             .inner
-            .retrieve_task(&task_id)
+            .retrieve_task(task_id)
             .await
             .map_err(map_generated_error)?
             .into_inner();
@@ -199,10 +198,9 @@ impl ApiClient {
 
     #[instrument(name = "cli.api.delete_task", skip_all, fields(task_id), err)]
     pub async fn delete_task(&self, task_id: &str) -> Result<Value, ApiError> {
-        let task_id = parse_uuid(task_id, "task_id")?;
         let response = self
             .inner
-            .delete_task(&task_id)
+            .delete_task(task_id)
             .await
             .map_err(map_generated_error)?
             .into_inner();
@@ -212,10 +210,9 @@ impl ApiClient {
 
     #[instrument(name = "cli.api.retry_task", skip_all, fields(task_id), err)]
     pub async fn retry_task(&self, task_id: &str) -> Result<Value, ApiError> {
-        let task_id = parse_uuid(task_id, "task_id")?;
         let response = self
             .inner
-            .retry_task(&task_id)
+            .retry_task(task_id)
             .await
             .map_err(map_generated_error)?
             .into_inner();
@@ -225,10 +222,9 @@ impl ApiClient {
 
     #[instrument(name = "cli.api.regenerate_task", skip_all, fields(task_id), err)]
     pub async fn regenerate_task_api(&self, task_id: &str) -> Result<Value, ApiError> {
-        let task_id = parse_uuid(task_id, "task_id")?;
         let response = self
             .inner
-            .regenerate_task(&task_id)
+            .regenerate_task(task_id)
             .await
             .map_err(map_generated_error)?
             .into_inner();
@@ -255,11 +251,9 @@ impl ApiClient {
             )
         })?;
 
-        let task_uuid = parse_uuid(task_id, "task_id")?;
-
         let mut runs = self
             .inner
-            .list_task_runs(&task_uuid)
+            .list_task_runs(task_id)
             .await
             .map_err(map_generated_error)?
             .into_inner();
@@ -312,10 +306,9 @@ impl ApiClient {
 
     #[instrument(name = "cli.api.get_run", skip_all, fields(run_id), err)]
     pub async fn get_run(&self, run_id: &str) -> Result<Value, ApiError> {
-        let run_id = parse_uuid(run_id, "run_id")?;
         let response = self
             .inner
-            .retrieve_run(&run_id)
+            .retrieve_run(run_id)
             .await
             .map_err(map_generated_error)?
             .into_inner();
@@ -325,10 +318,9 @@ impl ApiClient {
 
     #[instrument(name = "cli.api.get_run_logs", skip_all, fields(run_id), err)]
     pub async fn get_run_logs(&self, run_id: &str) -> Result<Value, ApiError> {
-        let run_id = parse_uuid(run_id, "run_id")?;
         let response = self
             .inner
-            .get_run_logs(&run_id)
+            .get_run_logs(run_id)
             .await
             .map_err(map_generated_error)?
             .into_inner();
