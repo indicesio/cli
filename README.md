@@ -54,7 +54,7 @@ indices runs get <run-uuid>
 indices runs logs <run-uuid>
 indices secrets create OPENAI_API_KEY --value "sk-..."
 indices secrets list
-indices secrets delete <secret-uuid>
+indices secrets delete <secret-id>
 ```
 
 Commands render Markdown by default. Use `--json` on any command for JSON output.

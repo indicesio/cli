@@ -19,13 +19,13 @@ To provide manual schemas instead, set both `--input-schema` and `--output-schem
 `--creation-params` accepts a JSON object with advanced task creation settings:
   `auto_generate_schemas` (bool): auto-generate schemas from captured traffic (default: true)
   `initial_input_values` (object): seed values used during task creation
-  `secrets` (array): secrets to bind during creation, e.g. `[{\"secret_uuid\":\"...\"}]`
+  `secrets` (array): secrets to bind during creation, e.g. `[{\"secret_id\":\"...\"}]`
 
 \x1b[1;97mExamples:\x1b[0m
   indices tasks create --display-name \"Apply Job\" --website \"https://example.com\" --task \"Fill application\"
   indices tasks create --display-name \"Apply Job\" --website \"https://example.com\" --task \"Fill application\" --input-schema '{\"type\":\"object\",\"properties\":{\"email\":{\"type\":\"string\"}}}' --output-schema '{\"type\":\"object\",\"properties\":{\"ok\":{\"type\":\"boolean\"}}}'
   indices tasks create --display-name \"Apply Job\" --website \"https://example.com\" --task \"Fill application\" --creation-params '{\"auto_generate_schemas\":false,\"initial_input_values\":{\"email\":\"user@example.com\"}}'
-  indices tasks create --display-name \"Apply Job\" --website \"https://example.com\" --task \"Fill application\" --creation-params '{\"secrets\":[{\"secret_uuid\":\"22222222-2222-2222-2222-222222222222\",\"description\":\"login credentials\"}]}'
+  indices tasks create --display-name \"Apply Job\" --website \"https://example.com\" --task \"Fill application\" --creation-params '{\"secrets\":[{\"secret_id\":\"sec_0A1b2C3d4E5f6G7h8I9j0K\",\"description\":\"login credentials\"}]}'
   indices tasks create --file task-payload.json
   cat task-payload.json | indices tasks create";
 
@@ -314,7 +314,7 @@ pub struct CreateSecretArgs {
 
 #[derive(Debug, Args)]
 pub struct DeleteSecretArgs {
-    pub uuid: String,
+    pub id: String,
 
     #[arg(long, default_value_t = false)]
     pub yes: bool,

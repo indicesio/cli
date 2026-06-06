@@ -198,7 +198,7 @@ indices tasks delete <task-uuid> --yes
 indices runs create \
   --task-id "<task-uuid>" \
   --arguments '{"key":"value"}' \
-  --secret-bindings '{"login":"<secret-uuid>"}'
+  --secret-bindings '{"login":"<secret-id>"}'
 ```
 
 Flags: `--task-id` (required), `--arguments <json-object>`, `--secret-bindings <json-object>`
@@ -233,10 +233,10 @@ indices secrets create MY_SECRET --value "..."    # explicit value
 echo "..." | indices secrets create MY_SECRET --stdin
 indices secrets create MY_SECRET                  # prompts securely
 indices secrets list
-indices secrets delete <secret-uuid> --yes
+indices secrets delete <secret-id> --yes
 ```
 
-Empty secret values are rejected. Reference secrets in runs via `--secret-bindings '{"binding_name":"<secret-uuid>"}'`.
+Empty secret values are rejected. Reference secrets in runs via `--secret-bindings '{"binding_name":"<secret-id>"}'`.
 
 ---
 

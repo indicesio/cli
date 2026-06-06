@@ -14,8 +14,8 @@ pub async fn handle_secrets_command(
     match command {
         SecretsCommand::Create(args) => create_secret(client, args).await,
         SecretsCommand::List => Ok(client.list_secrets().await?),
-        SecretsCommand::Delete(DeleteSecretArgs { uuid, yes }) => {
-            delete_secret(client, uuid, *yes).await
+        SecretsCommand::Delete(DeleteSecretArgs { id, yes }) => {
+            delete_secret(client, id, *yes).await
         }
     }
 }
@@ -32,19 +32,19 @@ async fn create_secret(client: &ApiClient, args: &CreateSecretArgs) -> Result<Va
     Ok(client.create_secret(&args.name, &value).await?)
 }
 
-async fn delete_secret(client: &ApiClient, uuid: &str, yes: bool) -> Result<Value, CliError> {
+async fn delete_secret(client: &ApiClient, id: &str, yes: bool) -> Result<Value, CliError> {
     if !yes {
-        let confirmed = prompt_confirm(&format!("Delete secret `{uuid}`?"))?;
+        let confirmed = prompt_confirm(&format!("Delete secret `{id}`?"))?;
         if !confirmed {
             return Ok(json!({
                 "deleted": false,
-                "uuid": uuid,
+                "id": id,
                 "message": "aborted"
             }));
         }
     }
 
-    Ok(client.delete_secret(uuid).await?)
+    Ok(client.delete_secret(id).await?)
 }
 
 fn secret_value(args: &CreateSecretArgs) -> Result<String, CliError> {

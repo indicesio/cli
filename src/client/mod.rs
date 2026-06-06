@@ -9,7 +9,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use thiserror::Error;
 use tracing::instrument;
-use uuid::Uuid;
 
 use crate::telemetry;
 
@@ -362,12 +361,11 @@ impl ApiClient {
         to_json_value(response)
     }
 
-    #[instrument(name = "cli.api.delete_secret", skip_all, fields(uuid), err)]
-    pub async fn delete_secret(&self, uuid: &str) -> Result<Value, ApiError> {
-        let uuid = parse_uuid(uuid, "uuid")?;
+    #[instrument(name = "cli.api.delete_secret", skip_all, fields(id), err)]
+    pub async fn delete_secret(&self, id: &str) -> Result<Value, ApiError> {
         let response = self
             .inner
-            .delete_user_secret_v1beta_secrets_id_delete(&uuid)
+            .delete_user_secret_v1beta_secrets_id_delete(id)
             .await
             .map_err(map_generated_error)?
             .into_inner();
@@ -378,12 +376,6 @@ impl ApiClient {
 
 fn to_json_value<T: Serialize>(value: T) -> Result<Value, ApiError> {
     serde_json::to_value(value).map_err(|error| ApiError::Serialization(error.to_string()))
-}
-
-fn parse_uuid(raw: &str, field: &str) -> Result<Uuid, ApiError> {
-    Uuid::parse_str(raw).map_err(|error| {
-        ApiError::InvalidArgument(format!("invalid {field} UUID `{raw}`: {error}"))
-    })
 }
 
 fn map_generated_error<E: Serialize>(error: generated::Error<E>) -> ApiError {
