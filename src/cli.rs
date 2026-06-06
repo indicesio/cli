@@ -336,12 +336,7 @@ mod tests {
 
     #[test]
     fn parses_runs_logs_command() {
-        let cli = Cli::parse_from([
-            "indices",
-            "runs",
-            "logs",
-            "run_0A1b2C3d4E5f6G7h8I9j0K",
-        ]);
+        let cli = Cli::parse_from(["indices", "runs", "logs", "run_0A1b2C3d4E5f6G7h8I9j0K"]);
 
         assert!(matches!(
             cli.command,
