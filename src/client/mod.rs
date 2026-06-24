@@ -136,24 +136,14 @@ impl ApiClient {
             |error| ApiError::InvalidArgument(format!("invalid create-task payload: {error}")),
         )?;
 
-        let response = self
-            .inner
-            .create_task(&request)
-            .await
-            .map_err(map_generated_error)?
-            .into_inner();
+        let response = map_generated_result(self.inner.create_task(&request).await).await?;
 
         to_json_value(response)
     }
 
     #[instrument(name = "cli.api.get_task", skip_all, fields(task_id), err)]
     pub async fn get_task(&self, task_id: &str) -> Result<Value, ApiError> {
-        let response = self
-            .inner
-            .retrieve_task(task_id)
-            .await
-            .map_err(map_generated_error)?
-            .into_inner();
+        let response = map_generated_result(self.inner.retrieve_task(task_id).await).await?;
 
         to_json_value(response)
     }
@@ -171,12 +161,7 @@ impl ApiClient {
             ));
         }
 
-        let mut tasks = self
-            .inner
-            .list_tasks()
-            .await
-            .map_err(map_generated_error)?
-            .into_inner();
+        let mut tasks = map_generated_result(self.inner.list_tasks().await).await?;
 
         if let Some(status) = status {
             let desired = generated::types::TaskState::from_str(status).map_err(|_| {
@@ -197,36 +182,21 @@ impl ApiClient {
 
     #[instrument(name = "cli.api.delete_task", skip_all, fields(task_id), err)]
     pub async fn delete_task(&self, task_id: &str) -> Result<Value, ApiError> {
-        let response = self
-            .inner
-            .delete_task(task_id)
-            .await
-            .map_err(map_generated_error)?
-            .into_inner();
+        let response = map_generated_result(self.inner.delete_task(task_id).await).await?;
 
         to_json_value(response)
     }
 
     #[instrument(name = "cli.api.retry_task", skip_all, fields(task_id), err)]
     pub async fn retry_task(&self, task_id: &str) -> Result<Value, ApiError> {
-        let response = self
-            .inner
-            .retry_task(task_id)
-            .await
-            .map_err(map_generated_error)?
-            .into_inner();
+        let response = map_generated_result(self.inner.retry_task(task_id).await).await?;
 
         to_json_value(response)
     }
 
     #[instrument(name = "cli.api.regenerate_task", skip_all, fields(task_id), err)]
     pub async fn regenerate_task_api(&self, task_id: &str) -> Result<Value, ApiError> {
-        let response = self
-            .inner
-            .regenerate_task(task_id)
-            .await
-            .map_err(map_generated_error)?
-            .into_inner();
+        let response = map_generated_result(self.inner.regenerate_task(task_id).await).await?;
 
         to_json_value(response)
     }
@@ -250,12 +220,7 @@ impl ApiClient {
             )
         })?;
 
-        let mut runs = self
-            .inner
-            .list_task_runs(task_id)
-            .await
-            .map_err(map_generated_error)?
-            .into_inner();
+        let mut runs = map_generated_result(self.inner.list_task_runs(task_id).await).await?;
 
         if let Some(limit) = limit {
             runs.truncate(limit as usize);
@@ -305,24 +270,14 @@ impl ApiClient {
 
     #[instrument(name = "cli.api.get_run", skip_all, fields(run_id), err)]
     pub async fn get_run(&self, run_id: &str) -> Result<Value, ApiError> {
-        let response = self
-            .inner
-            .retrieve_run(run_id)
-            .await
-            .map_err(map_generated_error)?
-            .into_inner();
+        let response = map_generated_result(self.inner.retrieve_run(run_id).await).await?;
 
         to_json_value(response)
     }
 
     #[instrument(name = "cli.api.get_run_logs", skip_all, fields(run_id), err)]
     pub async fn get_run_logs(&self, run_id: &str) -> Result<Value, ApiError> {
-        let response = self
-            .inner
-            .get_run_logs(run_id)
-            .await
-            .map_err(map_generated_error)?
-            .into_inner();
+        let response = map_generated_result(self.inner.get_run_logs(run_id).await).await?;
 
         to_json_value(response)
     }
@@ -339,36 +294,26 @@ impl ApiClient {
             website: None,
         };
 
-        let response = self
-            .inner
-            .create_secret_v1beta_secrets_post(&request)
-            .await
-            .map_err(map_generated_error)?
-            .into_inner();
+        let response =
+            map_generated_result(self.inner.create_secret_v1beta_secrets_post(&request).await)
+                .await?;
 
         to_json_value(response)
     }
 
     #[instrument(name = "cli.api.list_secrets", skip_all, err)]
     pub async fn list_secrets(&self) -> Result<Value, ApiError> {
-        let response = self
-            .inner
-            .list_user_secrets_v1beta_secrets_get()
-            .await
-            .map_err(map_generated_error)?
-            .into_inner();
+        let response =
+            map_generated_result(self.inner.list_user_secrets_v1beta_secrets_get().await).await?;
 
         to_json_value(response)
     }
 
     #[instrument(name = "cli.api.delete_secret", skip_all, fields(id), err)]
     pub async fn delete_secret(&self, id: &str) -> Result<Value, ApiError> {
-        let response = self
-            .inner
-            .delete_user_secret_v1beta_secrets_id_delete(id)
-            .await
-            .map_err(map_generated_error)?
-            .into_inner();
+        let response =
+            map_generated_result(self.inner.delete_user_secret_v1beta_secrets_id_delete(id).await)
+                .await?;
 
         to_json_value(response)
     }
@@ -378,7 +323,22 @@ fn to_json_value<T: Serialize>(value: T) -> Result<Value, ApiError> {
     serde_json::to_value(value).map_err(|error| ApiError::Serialization(error.to_string()))
 }
 
-fn map_generated_error<E: Serialize>(error: generated::Error<E>) -> ApiError {
+/// Unwraps a generated-client result, mapping any error through
+/// [`map_generated_error`] so undocumented status codes still surface a useful
+/// message instead of a bare "unexpected API response".
+async fn map_generated_result<T, E>(
+    result: Result<generated::ResponseValue<T>, generated::Error<E>>,
+) -> Result<T, ApiError>
+where
+    E: Serialize,
+{
+    match result {
+        Ok(response) => Ok(response.into_inner()),
+        Err(error) => Err(map_generated_error(error).await),
+    }
+}
+
+async fn map_generated_error<E: Serialize>(error: generated::Error<E>) -> ApiError {
     match error {
         generated::Error::InvalidRequest(message) | generated::Error::Custom(message) => {
             ApiError::InvalidRequest(message)
@@ -410,11 +370,15 @@ fn map_generated_error<E: Serialize>(error: generated::Error<E>) -> ApiError {
 
             ApiError::Serialization(format!("invalid response payload: {error}{detail}"))
         }
-        generated::Error::UnexpectedResponse(response) => ApiError::HttpStatus {
-            status: response.status().as_u16(),
-            message: "unexpected API response".to_string(),
-            body: None,
-        },
+        // Progenitor only matches the status codes documented in the OpenAPI spec
+        // (typically 200/202 and 422); everything else — 404, 401/403, 409, 429,
+        // 5xx — lands here. Read the body and route it through the same path as the
+        // hand-rolled callers so the backend's `detail` message reaches the user.
+        generated::Error::UnexpectedResponse(response) => {
+            let status = response.status();
+            let bytes = response.bytes().await.unwrap_or_default();
+            http_error_from_bytes(status, &bytes)
+        }
     }
 }
 
@@ -422,7 +386,7 @@ fn http_error_from_bytes(status: StatusCode, bytes: &[u8]) -> ApiError {
     let body = String::from_utf8_lossy(bytes).trim().to_string();
     let message = summarize_error_payload(&body).unwrap_or_else(|| {
         if body.is_empty() {
-            "request failed".to_string()
+            status_fallback_message(status)
         } else {
             body.clone()
         }
@@ -433,6 +397,22 @@ fn http_error_from_bytes(status: StatusCode, bytes: &[u8]) -> ApiError {
         message,
         body: if body.is_empty() { None } else { Some(body) },
     }
+}
+
+/// Human-readable fallback for when the backend returns an error status with no
+/// usable body (e.g. an empty 404), so the message is still descriptive.
+fn status_fallback_message(status: StatusCode) -> String {
+    let reason = match status {
+        StatusCode::NOT_FOUND => "not found",
+        StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN => "not authorized",
+        StatusCode::CONFLICT => "conflict",
+        StatusCode::TOO_MANY_REQUESTS => "rate limited",
+        _ if status.is_server_error() => "server error",
+        _ if status.is_client_error() => "request failed",
+        _ => "unexpected API response",
+    };
+
+    reason.to_string()
 }
 
 fn summarize_error_payload(raw: &str) -> Option<String> {
@@ -498,6 +478,42 @@ mod tests {
             summarize_error_payload(raw).as_deref(),
             Some("forbidden workspace access required")
         );
+    }
+
+    #[test]
+    fn http_error_from_bytes_surfaces_not_found_detail() {
+        // Mirrors `indices runs logs <id>` 404: previously this came back as the
+        // generic "unexpected API response"; now the backend's `detail` survives.
+        let error =
+            http_error_from_bytes(StatusCode::NOT_FOUND, br#"{"detail":"Run not found"}"#);
+
+        match error {
+            ApiError::HttpStatus {
+                status, message, ..
+            } => {
+                assert_eq!(status, 404);
+                assert_eq!(message, "Run not found");
+            }
+            other => panic!("expected http status error, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn http_error_from_bytes_falls_back_to_status_for_empty_body() {
+        let error = http_error_from_bytes(StatusCode::NOT_FOUND, b"");
+
+        match error {
+            ApiError::HttpStatus {
+                status,
+                message,
+                body,
+            } => {
+                assert_eq!(status, 404);
+                assert_eq!(message, "not found");
+                assert!(body.is_none());
+            }
+            other => panic!("expected http status error, got {other:?}"),
+        }
     }
 
     #[test]
