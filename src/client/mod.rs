@@ -311,9 +311,12 @@ impl ApiClient {
 
     #[instrument(name = "cli.api.delete_secret", skip_all, fields(id), err)]
     pub async fn delete_secret(&self, id: &str) -> Result<Value, ApiError> {
-        let response =
-            map_generated_result(self.inner.delete_user_secret_v1beta_secrets_id_delete(id).await)
-                .await?;
+        let response = map_generated_result(
+            self.inner
+                .delete_user_secret_v1beta_secrets_id_delete(id)
+                .await,
+        )
+        .await?;
 
         to_json_value(response)
     }
@@ -484,8 +487,7 @@ mod tests {
     fn http_error_from_bytes_surfaces_not_found_detail() {
         // Mirrors `indices runs logs <id>` 404: previously this came back as the
         // generic "unexpected API response"; now the backend's `detail` survives.
-        let error =
-            http_error_from_bytes(StatusCode::NOT_FOUND, br#"{"detail":"Run not found"}"#);
+        let error = http_error_from_bytes(StatusCode::NOT_FOUND, br#"{"detail":"Run not found"}"#);
 
         match error {
             ApiError::HttpStatus {
