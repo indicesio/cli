@@ -77,26 +77,18 @@ fn load_create_task_payload(args: &CreateTaskArgs) -> Result<Value, CliError> {
     }
 
     Err(CliError::Message(
-        "provide task arguments (`--display-name`, `--website`, `--task`) or one of `--body`, `--file`, `--stdin`"
+        "provide task arguments (`--display-name`, `--task`) or one of `--body`, `--file`, `--stdin`"
             .to_string(),
     ))
 }
 
 fn has_task_argument_values(args: &CreateTaskArgs) -> bool {
-    args.display_name.is_some()
-        || args.website.is_some()
-        || args.task.is_some()
-        || args.input_schema.is_some()
-        || args.output_schema.is_some()
-        || args.creation_params.is_some()
+    args.display_name.is_some() || args.task.is_some() || args.creation_params.is_some()
 }
 
 fn build_task_payload_from_args(args: &CreateTaskArgs) -> Result<Value, CliError> {
     let display_name = args.display_name.clone().ok_or_else(|| {
         CliError::Message("`tasks create` requires `--display-name` in argument mode".to_string())
-    })?;
-    let website = args.website.clone().ok_or_else(|| {
-        CliError::Message("`tasks create` requires `--website` in argument mode".to_string())
     })?;
     let task = args.task.clone().ok_or_else(|| {
         CliError::Message("`tasks create` requires `--task` in argument mode".to_string())
@@ -114,23 +106,7 @@ fn build_task_payload_from_args(args: &CreateTaskArgs) -> Result<Value, CliError
         Value::Object(creation_params),
     );
     payload.insert("display_name".to_string(), Value::String(display_name));
-    payload.insert("website".to_string(), Value::String(website));
     payload.insert("task".to_string(), Value::String(task));
-
-    // Schemas are sent as JSON-encoded strings, not objects — the API expects them this way.
-    if let Some(input_schema) = &args.input_schema {
-        payload.insert(
-            "input_schema".to_string(),
-            Value::String(input_schema.clone()),
-        );
-    }
-
-    if let Some(output_schema) = &args.output_schema {
-        payload.insert(
-            "output_schema".to_string(),
-            Value::String(output_schema.clone()),
-        );
-    }
 
     Ok(Value::Object(payload))
 }
@@ -155,17 +131,13 @@ mod tests {
         let args = CreateTaskArgs {
             payload: empty_payload_source(),
             display_name: Some("Apply Job".to_string()),
-            website: Some("https://example.com".to_string()),
             task: Some("Fill out application".to_string()),
-            input_schema: None,
-            output_schema: None,
             creation_params: None,
         };
 
         let payload = build_task_payload_from_args(&args).expect("payload should build");
 
         assert_eq!(payload["display_name"], "Apply Job");
-        assert_eq!(payload["website"], "https://example.com");
         assert_eq!(payload["task"], "Fill out application");
         assert_eq!(payload["creation_params"], json!({}));
     }
@@ -175,10 +147,7 @@ mod tests {
         let args = CreateTaskArgs {
             payload: empty_payload_source(),
             display_name: Some("Apply Job".to_string()),
-            website: Some("https://example.com".to_string()),
             task: Some("Fill out application".to_string()),
-            input_schema: None,
-            output_schema: None,
             creation_params: Some("[]".to_string()),
         };
 

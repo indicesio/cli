@@ -7,25 +7,20 @@ use clap::{Args, Parser, Subcommand};
 const TASKS_CREATE_AFTER_HELP: &str = "\
 \x1b[1;97mModes:\x1b[0m
 Parameters can be supplied in one of three different ways:
-  Command args: pass `--display-name`, `--website`, and `--task` (+ optional schema/params flags)
+  Command args: pass `--display-name` and `--task` (+ optional `--creation-params`)
   Raw JSON as parameter: pass one of `--body`, `--file`, `--stdin` (do not mix with argument mode)
   Piped JSON: if no mode flags are provided and stdin has data, JSON is read from stdin
 
 \x1b[1;97mSchemas:\x1b[0m
-By default, Indices auto-generates `input_schema` and `output_schema`.
-To provide manual schemas instead, set both `--input-schema` and `--output-schema`.
+Indices automatically generates `input_schema` and `output_schema` for every task.
 
 \x1b[1;97mCreation Params:\x1b[0m
 `--creation-params` accepts a JSON object with advanced task creation settings:
-  `auto_generate_schemas` (bool): auto-generate schemas from captured traffic (default: true)
-  `initial_input_values` (object): seed values used during task creation
   `secrets` (array): secrets to bind during creation, e.g. `[{\"secret_id\":\"...\"}]`
 
 \x1b[1;97mExamples:\x1b[0m
-  indices tasks create --display-name \"Apply Job\" --website \"https://example.com\" --task \"Fill application\"
-  indices tasks create --display-name \"Apply Job\" --website \"https://example.com\" --task \"Fill application\" --input-schema '{\"type\":\"object\",\"properties\":{\"email\":{\"type\":\"string\"}}}' --output-schema '{\"type\":\"object\",\"properties\":{\"ok\":{\"type\":\"boolean\"}}}'
-  indices tasks create --display-name \"Apply Job\" --website \"https://example.com\" --task \"Fill application\" --creation-params '{\"auto_generate_schemas\":false,\"initial_input_values\":{\"email\":\"user@example.com\"}}'
-  indices tasks create --display-name \"Apply Job\" --website \"https://example.com\" --task \"Fill application\" --creation-params '{\"secrets\":[{\"secret_id\":\"sec_0A1b2C3d4E5f6G7h8I9j0K\",\"description\":\"login credentials\"}]}'
+  indices tasks create --display-name \"Apply Job\" --task \"Fill the job application form on example.com\"
+  indices tasks create --display-name \"Apply Job\" --task \"Fill the job application form on example.com\" --creation-params '{\"secrets\":[{\"secret_id\":\"sec_0A1b2C3d4E5f6G7h8I9j0K\",\"description\":\"login credentials\"}]}'
   indices tasks create --file task-payload.json
   cat task-payload.json | indices tasks create";
 
@@ -181,28 +176,10 @@ pub struct CreateTaskArgs {
     #[arg(long, help = "Task title shown in dashboard")]
     pub display_name: Option<String>,
 
-    #[arg(long, help = "Website URL for the task")]
-    pub website: Option<String>,
-
     #[arg(long, help = "Detailed instructions for the task")]
     pub task: Option<String>,
 
-    #[arg(
-        long,
-        help = "Input JSON schema string; optional when schemas are auto-generated"
-    )]
-    pub input_schema: Option<String>,
-
-    #[arg(
-        long,
-        help = "Output JSON schema string; optional when schemas are auto-generated"
-    )]
-    pub output_schema: Option<String>,
-
-    #[arg(
-        long,
-        help = "JSON object for advanced creation settings (auto_generate_schemas, initial_input_values, secrets)"
-    )]
+    #[arg(long, help = "JSON object for advanced creation settings (secrets)")]
     pub creation_params: Option<String>,
 }
 

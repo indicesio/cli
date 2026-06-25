@@ -47,7 +47,7 @@ indices login --api-key
 indices login --api-key "idx_..."
 indices whoami
 indices tasks list
-indices tasks create --display-name "Apply Job" --website "https://example.com" --task "Fill form"
+indices tasks create --display-name "Apply Job" --task "Fill the form on example.com"
 indices runs create --task-id "<task-uuid>" --arguments '{"job_id":"123"}'
 indices runs list --task-id <task-uuid>
 indices runs get <run-uuid>
@@ -60,7 +60,7 @@ indices secrets delete <secret-id>
 Commands render Markdown by default. Use `--json` on any command for JSON output.
 
 Create methods support:
-- Argument mode by default (for example, `--task-id`, `--display-name`, `--website`, `--task`)
+- Argument mode by default (for example, `--task-id`, `--display-name`, `--task`)
 - Piped JSON from stdin:
   - `cat payload.json | indices runs create`
   - `cat payload.json | indices tasks create`

@@ -66,8 +66,7 @@ indices whoami                              # verify stored credentials
 # 1. Create a task
 indices tasks create \
   --display-name "Scrape product price" \
-  --website "https://example.com/products" \
-  --task "Find the current price of the item with the given product ID"
+  --task "On example.com, find the current price of the item with the given product ID"
 
 # You'll need to show an example once.\
 # Ask the user to perform it in the embedded browser. A URL is returned by the `indices tasks create` command.
@@ -132,23 +131,15 @@ If you find usable existing tasks in `ready` state, skip straight to creating a 
 If no existing task fits, create a new one. The required fields are:
 
 - **`--display-name`** — a short human-readable label
-- **`--website`** — the URL of the site where the action happens
 - **`--task`** — a natural-language description of what to do
-
-You do not need the user to spell out these fields verbatim. Synthesise them from context where possible — if the user says *"scrape prices from acme.com"*, you already have enough to fill in all three fields.
 
 ```bash
 indices tasks create \
   --display-name "Apply to jobs" \
-  --website "https://jobs.example.com" \
-  --task "Fill and submit the application form"
+  --task "Fill and submit the application form on jobs.example.com"
 ```
 
 If the task involves logging into a site, create a secret first (see **Secrets** below) so credentials aren't passed as plain arguments.
-
-> **Never** set `is_fully_autonomous` to `true`.
-
-Prefer the simple form above. Do not pass `--creation-params` unless you need a specific advanced option. Schema auto-generation is the default — leave it enabled unless intentionally providing manual schemas. If you disable it (`creation_params.auto_generate_schemas` = `false`), you must provide both `--input-schema` and `--output-schema`.
 
 ### Step 3: Show Indices How It's Done
 

@@ -287,8 +287,6 @@ fn should_redact_flag(flag: &str) -> bool {
             | "--arguments"
             | "--secret-bindings"
             | "--creation-params"
-            | "--input-schema"
-            | "--output-schema"
     )
 }
 
