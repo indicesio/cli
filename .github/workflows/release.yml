@@ -101,18 +101,25 @@ jobs:
 
       # linux_x86_64 and linux_arm64 share ubuntu-latest; key on the rustc
       # target so their dependency artifacts do not overwrite each other.
+      # cache-bin keeps the git-built `cross` binary for linux_arm64.
       - name: Cache Rust
         uses: Swatinem/rust-cache@v2
         with:
           key: ${{ matrix.target }}
-          cache-bin: false
           cache-on-failure: true
 
+      # Install from git: crates.io/GitHub 0.2.5 is years old and does not
+      # track current rustc. rust-cache restores ~/.cargo/bin/cross on hits.
       - name: Install cross
         if: matrix.use_cross == 'true'
-        uses: taiki-e/install-action@v2
-        with:
-          tool: cross
+        shell: bash
+        run: |
+          set -euo pipefail
+          if command -v cross >/dev/null; then
+            echo "Using cached $(cross --version)"
+          else
+            cargo install cross --git https://github.com/cross-rs/cross
+          fi
 
       - name: Build binary
         shell: bash
