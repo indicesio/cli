@@ -201,6 +201,7 @@ pub fn route_for_command(command: &Command) -> &'static str {
         Command::Login(_) => "auth.login",
         Command::Logout => "auth.logout",
         Command::Whoami => "auth.whoami",
+        Command::Update(_) => "update",
         Command::Connectors { command } => match command {
             ConnectorsCommand::List(_) => "connectors.list",
             ConnectorsCommand::Get(_) => "connectors.get",
@@ -244,6 +245,7 @@ fn command_name(command: &Command) -> &'static str {
         Command::Login(_) => "login",
         Command::Logout => "logout",
         Command::Whoami => "whoami",
+        Command::Update(_) => "update",
         Command::Connectors { command } => match command {
             ConnectorsCommand::List(_) => "connectors list",
             ConnectorsCommand::Get(_) => "connectors get",
@@ -405,6 +407,10 @@ mod tests {
     fn route_mapping_covers_nested_commands() {
         let cli = Cli::parse_from(["indices", "runs", "logs", "123"]);
         assert_eq!(route_for_command(&cli.command), "runs.logs");
+
+        let cli = Cli::parse_from(["indices", "update", "--check"]);
+        assert_eq!(route_for_command(&cli.command), "update");
+        assert_eq!(command_name(&cli.command), "update");
     }
 
     #[test]

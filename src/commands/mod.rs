@@ -5,6 +5,7 @@ pub mod files;
 pub mod payload;
 pub mod runs;
 pub mod secrets;
+pub mod update;
 
 use std::io::{self, Write};
 

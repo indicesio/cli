@@ -46,6 +46,8 @@ indices login
 indices login --api-key
 indices login --api-key "idx_..."
 indices whoami
+indices update
+indices update --check
 
 indices connectors list
 indices connectors list --domain example.com

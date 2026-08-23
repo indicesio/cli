@@ -51,6 +51,8 @@ Installs to `~/.local/bin`. If `indices` isn't found after install, add `~/.loca
 - **zsh**: `echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc && source ~/.zshrc`
 - **fish**: `fish_add_path ~/.local/bin`
 
+**Updates:** run `indices update`.
+
 ### Authenticate
 
 ```bash

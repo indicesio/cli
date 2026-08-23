@@ -36,6 +36,12 @@ const CAPTURES_START_AFTER_HELP: &str = "\
   indices captures start --use-proxy
   indices captures start --cookies '[{\"name\":\"sid\",\"value\":\"abc\",\"domain\":\"example.com\"}]'";
 
+const UPDATE_AFTER_HELP: &str = "\
+\x1b[1;97mExamples:\x1b[0m
+  indices update
+  indices update --check
+  indices update --version 0.2.0";
+
 fn cli_styles() -> Styles {
     Styles::styled()
         .header(AnsiColor::BrightWhite.on_default().effects(Effects::BOLD))
@@ -85,6 +91,12 @@ pub enum Command {
     Logout,
     #[command(about = "Show the current authenticated user")]
     Whoami,
+    #[command(
+        about = "Update the Indices CLI",
+        long_about = None,
+        after_help = UPDATE_AFTER_HELP
+    )]
+    Update(UpdateArgs),
     #[command(about = "Manage connectors")]
     Connectors {
         #[command(subcommand)]
@@ -110,6 +122,23 @@ pub enum Command {
         #[command(subcommand)]
         command: SecretsCommand,
     },
+}
+
+#[derive(Debug, Args)]
+pub struct UpdateArgs {
+    #[arg(
+        long,
+        value_name = "X.Y.Z",
+        help = "Install a specific version instead of latest"
+    )]
+    pub version: Option<String>,
+
+    #[arg(
+        long,
+        default_value_t = false,
+        help = "Check for an update without installing"
+    )]
+    pub check: bool,
 }
 
 #[derive(Debug, Args)]
@@ -480,6 +509,7 @@ mod tests {
 
     use super::{
         Cli, Command, ConnectorsCommand, LoginArgs, RunIdArgs, RunsCommand, SecretsCommand,
+        UpdateArgs,
     };
 
     #[test]
@@ -520,6 +550,32 @@ mod tests {
         let cli = Cli::parse_from(["indices", "whoami"]);
 
         assert!(matches!(cli.command, Command::Whoami));
+    }
+
+    #[test]
+    fn parses_update_command() {
+        let cli = Cli::parse_from(["indices", "update"]);
+
+        assert!(matches!(
+            cli.command,
+            Command::Update(UpdateArgs {
+                version: None,
+                check: false,
+            })
+        ));
+    }
+
+    #[test]
+    fn parses_update_check_and_version() {
+        let cli = Cli::parse_from(["indices", "update", "--check", "--version", "0.2.0"]);
+
+        assert!(matches!(
+            cli.command,
+            Command::Update(UpdateArgs {
+                version: Some(ref version),
+                check: true,
+            }) if version == "0.2.0"
+        ));
     }
 
     #[test]

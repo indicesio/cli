@@ -97,6 +97,12 @@ async fn execute_command(
             commands::auth::logout(config_store)?;
             Ok(())
         }
+        Command::Update(args) => {
+            let runtime = config_store.resolve_runtime(overrides)?;
+            analytics.capture_command_start(telemetry).await;
+            commands::update::run(args, runtime.timeout_seconds, cli.json).await?;
+            Ok(())
+        }
         _ => {
             let runtime = config_store.resolve_runtime(overrides)?;
             let mut session = runtime.auth.clone().ok_or(CliError::NotAuthenticated)?;
@@ -196,7 +202,7 @@ async fn execute_authenticated_command(
         Command::Secrets { command } => Ok(CommandResponse::Value(
             commands::secrets::handle_secrets_command(client, command).await?,
         )),
-        Command::Login(_) | Command::Logout => {
+        Command::Login(_) | Command::Logout | Command::Update(_) => {
             Err(CliError::Message("unexpected command routing".to_string()))
         }
     }
