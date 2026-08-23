@@ -99,10 +99,20 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
+      # linux_x86_64 and linux_arm64 share ubuntu-latest; key on the rustc
+      # target so their dependency artifacts do not overwrite each other.
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+          cache-bin: false
+          cache-on-failure: true
+
       - name: Install cross
         if: matrix.use_cross == 'true'
-        shell: bash
-        run: cargo install cross --git https://github.com/cross-rs/cross
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cross
 
       - name: Build binary
         shell: bash
