@@ -17,7 +17,7 @@ use crate::cli::{Cli, Command};
 use crate::client::{ApiClient, ClientOptions};
 use crate::commands::auth::WhoamiOutput;
 use crate::config::{ConfigStore, OutputMode, RuntimeConfig, RuntimeOverrides, StoredSession};
-use crate::errors::CliError;
+use crate::errors::{CliError, record_cli_outcome};
 
 enum CommandResponse {
     Value(Value),
@@ -45,8 +45,14 @@ async fn main() {
     }
 }
 
-#[instrument(name = "cli.run", skip_all, err)]
+#[instrument(name = "cli.run", skip_all)]
 async fn run() -> Result<(), CliError> {
+    let result = run_inner().await;
+    record_cli_outcome(&result);
+    result
+}
+
+async fn run_inner() -> Result<(), CliError> {
     let argv: Vec<String> = std::env::args().collect();
     if argv.len() == 2 && argv[1] == "--version" {
         println!("Indices CLI v{}", env!("CARGO_PKG_VERSION"));
@@ -77,8 +83,20 @@ async fn run() -> Result<(), CliError> {
     result
 }
 
-#[instrument(name = "cli.command", skip_all, err)]
+#[instrument(name = "cli.command", skip_all)]
 async fn execute_command(
+    analytics: &Analytics,
+    telemetry: &mut analytics::CommandTelemetryContext,
+    config_store: &mut ConfigStore,
+    overrides: &RuntimeOverrides<'_>,
+    cli: &Cli,
+) -> Result<(), CliError> {
+    let result = execute_command_inner(analytics, telemetry, config_store, overrides, cli).await;
+    record_cli_outcome(&result);
+    result
+}
+
+async fn execute_command_inner(
     analytics: &Analytics,
     telemetry: &mut analytics::CommandTelemetryContext,
     config_store: &mut ConfigStore,
