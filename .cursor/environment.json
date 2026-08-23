@@ -1,0 +1,5 @@
+{
+  "name": "Indices CLI",
+  "user": "ubuntu",
+  "install": "./.cursor/install.sh"
+}
