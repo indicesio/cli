@@ -151,7 +151,7 @@ jobs:
           "asset_name=$assetName" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
       - name: Upload packaged asset
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: asset-${{ matrix.asset_target }}
           path: dist/*
@@ -171,7 +171,7 @@ jobs:
           fetch-depth: 0
 
       - name: Download packaged assets
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: asset-*
           merge-multiple: true
