@@ -236,7 +236,6 @@ pub fn route_for_command(command: &Command) -> &'static str {
             SecretsCommand::Delete(_) => "secrets.delete",
             SecretsCommand::Totp(_) => "secrets.totp",
         },
-        Command::Tasks { .. } => "tasks.removed",
     }
 }
 
@@ -280,7 +279,6 @@ fn command_name(command: &Command) -> &'static str {
             SecretsCommand::Delete(_) => "secrets delete",
             SecretsCommand::Totp(_) => "secrets totp",
         },
-        Command::Tasks { .. } => "tasks",
     }
 }
 
@@ -326,7 +324,6 @@ fn should_redact_flag(flag: &str) -> bool {
             | "--body"
             | "--arguments"
             | "--secret-bindings"
-            | "--creation-params"
     )
 }
 

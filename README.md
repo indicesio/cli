@@ -90,8 +90,6 @@ Create methods support:
 
 Connectors are created and revised in the [Indices dashboard](https://platform.indices.io). The CLI lists, inspects, runs, and manages them.
 
-`indices tasks` has been removed. Use `indices connectors` and `indices runs create --connector-id` instead.
-
 ## Config
 
 Config is stored at:

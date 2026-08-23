@@ -4,16 +4,6 @@ use clap::builder::Styles;
 use clap::builder::styling::{AnsiColor, Effects};
 use clap::{Args, Parser, Subcommand};
 
-pub const TASKS_REMOVED_MESSAGE: &str = "\
-The `tasks` command has been removed. Indices now uses connectors.
-
-  indices tasks list          →  indices connectors list
-  indices tasks get <id>      →  indices connectors get <id>
-  indices tasks delete <id>   →  indices connectors delete <id>
-  indices runs create --task-id <id>  →  indices runs create --connector-id <id>
-
-Create and revise connectors in the dashboard: https://platform.indices.io";
-
 const RUNS_CREATE_AFTER_HELP: &str = "\
 \x1b[1;97mModes:\x1b[0m
 Parameters can be supplied in one of three different ways:
@@ -119,11 +109,6 @@ pub enum Command {
     Secrets {
         #[command(subcommand)]
         command: SecretsCommand,
-    },
-    #[command(about = "Removed. Use `connectors` instead.")]
-    Tasks {
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true, hide = true)]
-        _rest: Vec<String>,
     },
 }
 
@@ -578,12 +563,5 @@ mod tests {
                 command: SecretsCommand::Totp(ref args)
             } if args.id == "sec_123"
         ));
-    }
-
-    #[test]
-    fn parses_removed_tasks_command() {
-        let cli = Cli::parse_from(["indices", "tasks", "list"]);
-
-        assert!(matches!(cli.command, Command::Tasks { .. }));
     }
 }

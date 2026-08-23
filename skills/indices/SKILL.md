@@ -253,7 +253,6 @@ After `start`, give the user the `iframe_url` so they can perform the workflow. 
 | Symptom | Fix |
 |---|---|
 | `command not found: indices` | Run `curl -fsSL https://get.indices.io \| sh` to install, then add `~/.local/bin` to PATH (see Install section) |
-| `tasks` command not found / removed | Use `indices connectors` and `indices runs create --connector-id` |
 | No connector for the website | Ask the user to create one at https://platform.indices.io |
 | Run `status` is `pending` or `running` | Poll `indices runs get <run-id>` |
 | Run `connector_error` | Read `error` on the run; fetch logs if `has_logs` is true |

@@ -11,7 +11,6 @@ const PRIORITY_KEYS: &[&str] = &[
     "display_name",
     "connector_id",
     "file_id",
-    "task_id",
     "run_id",
     "purpose",
     "website",
