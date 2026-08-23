@@ -1,12 +1,13 @@
 pub mod generated;
 
+use std::num::NonZeroU64;
 use std::str::FromStr;
 use std::time::Duration;
 
 use reqwest::StatusCode;
 use reqwest::header::{ACCEPT, AUTHORIZATION, HeaderMap, HeaderName, HeaderValue};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{Value, json};
 use thiserror::Error;
 use tracing::instrument;
 
@@ -25,6 +26,7 @@ pub struct ClientOptions {
 #[derive(Debug)]
 pub struct ApiClient {
     inner: generated::Client,
+    options: ClientOptions,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -77,27 +79,12 @@ impl ApiClient {
         let _ = reqwest::Url::parse(&options.api_base)
             .map_err(|_| ApiError::InvalidBaseUrl(options.api_base.clone()))?;
 
-        let mut headers = HeaderMap::new();
-        let mut auth_value = HeaderValue::from_str(&format!("Bearer {}", options.bearer_token))
-            .map_err(|_| {
-                ApiError::InvalidRequest(
-                    "bearer token contains invalid header characters".to_string(),
-                )
-            })?;
-        auth_value.set_sensitive(true);
-        headers.insert(AUTHORIZATION, auth_value);
-        headers.insert(
-            HeaderName::from_static(REQUEST_SOURCE_HEADER),
-            HeaderValue::from_static(REQUEST_SOURCE_CLI),
-        );
-
-        let http = reqwest::Client::builder()
-            .default_headers(headers)
-            .timeout(Duration::from_secs(options.timeout_seconds))
-            .build()?;
+        let headers = default_api_headers(&options)?;
+        let http = build_http_client(&headers, options.timeout_seconds)?;
 
         Ok(Self {
             inner: generated::Client::new_with_client(&options.api_base, http),
+            options,
         })
     }
 
@@ -130,103 +117,86 @@ impl ApiClient {
             .map_err(|error| ApiError::Serialization(format!("invalid response payload: {error}")))
     }
 
-    #[instrument(name = "cli.api.create_task", skip_all, err)]
-    pub async fn create_task(&self, body: Value) -> Result<Value, ApiError> {
-        let request = serde_json::from_value::<generated::types::CreateTaskRequest>(body).map_err(
-            |error| ApiError::InvalidArgument(format!("invalid create-task payload: {error}")),
-        )?;
-
-        let response = map_generated_result(self.inner.create_task(&request).await).await?;
-
-        to_json_value(response)
-    }
-
-    #[instrument(name = "cli.api.get_task", skip_all, fields(task_id), err)]
-    pub async fn get_task(&self, task_id: &str) -> Result<Value, ApiError> {
-        let response = map_generated_result(self.inner.retrieve_task(task_id).await).await?;
-
-        to_json_value(response)
-    }
-
-    #[instrument(name = "cli.api.list_tasks", skip_all, fields(status, limit), err)]
-    pub async fn list_tasks(
+    #[instrument(name = "cli.api.list_connectors", skip_all, fields(limit, domain), err)]
+    pub async fn list_connectors(
         &self,
-        status: Option<&str>,
         limit: Option<u32>,
         cursor: Option<&str>,
+        domain: Option<&str>,
     ) -> Result<Value, ApiError> {
-        if cursor.is_some() {
-            return Err(ApiError::InvalidArgument(
-                "`--cursor` is not supported by the current Tasks API".to_string(),
-            ));
-        }
-
-        let mut tasks = map_generated_result(self.inner.list_tasks().await).await?;
-
-        if let Some(status) = status {
-            let desired = generated::types::TaskState::from_str(status).map_err(|_| {
-                ApiError::InvalidArgument(format!(
-                    "invalid --status `{status}`; expected one of: not_ready, waiting_for_manual_completion, ready, failed"
-                ))
-            })?;
-
-            tasks.retain(|task| task.current_state == desired);
-        }
-
-        if let Some(limit) = limit {
-            tasks.truncate(limit as usize);
-        }
-
-        to_json_value(tasks)
-    }
-
-    #[instrument(name = "cli.api.delete_task", skip_all, fields(task_id), err)]
-    pub async fn delete_task(&self, task_id: &str) -> Result<Value, ApiError> {
-        let response = map_generated_result(self.inner.delete_task(task_id).await).await?;
+        let response = map_generated_result(
+            self.inner
+                .list_connectors(cursor, domain, parse_limit(limit)?)
+                .await,
+        )
+        .await?;
 
         to_json_value(response)
     }
 
-    #[instrument(name = "cli.api.retry_task", skip_all, fields(task_id), err)]
-    pub async fn retry_task(&self, task_id: &str) -> Result<Value, ApiError> {
-        let response = map_generated_result(self.inner.retry_task(task_id).await).await?;
+    #[instrument(name = "cli.api.get_connector", skip_all, fields(connector_id), err)]
+    pub async fn get_connector(&self, connector_id: &str) -> Result<Value, ApiError> {
+        let response =
+            map_generated_result(self.inner.retrieve_connector(connector_id).await).await?;
 
         to_json_value(response)
     }
 
-    #[instrument(name = "cli.api.regenerate_task", skip_all, fields(task_id), err)]
-    pub async fn regenerate_task_api(&self, task_id: &str) -> Result<Value, ApiError> {
-        let response = map_generated_result(self.inner.regenerate_task(task_id).await).await?;
-
-        to_json_value(response)
-    }
-
-    #[instrument(name = "cli.api.list_runs", skip_all, fields(task_id, limit), err)]
-    pub async fn list_runs(
+    #[instrument(name = "cli.api.rename_connector", skip_all, fields(connector_id), err)]
+    pub async fn rename_connector(
         &self,
-        task_id: Option<&str>,
-        limit: Option<u32>,
-        cursor: Option<&str>,
+        connector_id: &str,
+        display_name: &str,
     ) -> Result<Value, ApiError> {
-        if cursor.is_some() {
-            return Err(ApiError::InvalidArgument(
-                "`--cursor` is not supported by the current Runs API".to_string(),
-            ));
-        }
-
-        let task_id = task_id.ok_or_else(|| {
-            ApiError::InvalidArgument(
-                "`runs list` requires `--task-id` in the current API".to_string(),
-            )
+        let request = serde_json::from_value::<generated::types::RenameConnectorRequest>(json!({
+            "display_name": display_name,
+        }))
+        .map_err(|error| {
+            ApiError::InvalidArgument(format!("invalid connector display name: {error}"))
         })?;
 
-        let mut runs = map_generated_result(self.inner.list_task_runs(task_id).await).await?;
+        let response =
+            map_generated_result(self.inner.update_connector(connector_id, &request).await).await?;
 
-        if let Some(limit) = limit {
-            runs.truncate(limit as usize);
-        }
+        to_json_value(response)
+    }
 
-        to_json_value(runs)
+    #[instrument(name = "cli.api.delete_connector", skip_all, fields(connector_id), err)]
+    pub async fn delete_connector(&self, connector_id: &str) -> Result<Value, ApiError> {
+        let response =
+            map_generated_result(self.inner.delete_connector(connector_id).await).await?;
+
+        to_json_value(response)
+    }
+
+    #[instrument(
+        name = "cli.api.list_connector_revisions",
+        skip_all,
+        fields(connector_id),
+        err
+    )]
+    pub async fn list_connector_revisions(&self, connector_id: &str) -> Result<Value, ApiError> {
+        let response =
+            map_generated_result(self.inner.list_connector_revisions(connector_id).await).await?;
+
+        to_json_value(response)
+    }
+
+    #[instrument(name = "cli.api.list_runs", skip_all, fields(connector_id, limit), err)]
+    pub async fn list_runs(
+        &self,
+        connector_id: &str,
+        limit: Option<u32>,
+        cursor: Option<&str>,
+    ) -> Result<Value, ApiError> {
+        let response = map_generated_result(
+            self.inner
+                .list_runs(connector_id, cursor, parse_limit(limit)?)
+                .await,
+        )
+        .await?;
+
+        to_json_value(response)
     }
 
     #[instrument(name = "cli.api.create_run", skip_all, err)]
@@ -235,14 +205,23 @@ impl ApiClient {
             |error| ApiError::InvalidArgument(format!("invalid create-run payload: {error}")),
         )?;
 
+        // Sync runs can block until max_timeout_s. The shared client timeout is
+        // typically much shorter, so this request uses a dedicated HTTP client.
+        let request_timeout = if request.async_ {
+            self.options.timeout_seconds
+        } else {
+            self.options
+                .timeout_seconds
+                .max(request.max_timeout_s.get().saturating_add(30))
+        };
+        let http = self.http_client_with_timeout(request_timeout)?;
+
         // Handle runs.create manually so undocumented 4xx responses and schema-drift
         // in error payloads still surface the backend's actual message.
         let mut trace_headers = HeaderMap::new();
         telemetry::inject_trace_context(&mut trace_headers);
 
-        let response = self
-            .inner
-            .client
+        let response = http
             .post(format!("{}/v1beta/runs", self.inner.baseurl))
             .headers(trace_headers)
             .header(reqwest::header::ACCEPT, "application/json")
@@ -282,8 +261,210 @@ impl ApiClient {
         to_json_value(response)
     }
 
-    #[instrument(name = "cli.api.create_secret", skip_all, fields(name), err)]
-    pub async fn create_secret(&self, name: &str, value: &str) -> Result<Value, ApiError> {
+    #[instrument(name = "cli.api.list_files", skip_all, err)]
+    #[allow(clippy::too_many_arguments)]
+    pub async fn list_files(
+        &self,
+        run_id: Option<&str>,
+        connector_id: Option<&str>,
+        filename: Option<&str>,
+        source: Option<&str>,
+        sort: Option<&str>,
+        order: Option<&str>,
+        limit: Option<u32>,
+        cursor: Option<&str>,
+    ) -> Result<Value, ApiError> {
+        let source = parse_optional_enum::<generated::types::FileSource>(
+            source,
+            "--source",
+            "UPLOAD, RUN_OUTPUT",
+        )?;
+        let sort = parse_optional_enum::<generated::types::FileListSort>(
+            sort,
+            "--sort",
+            "name, created_at, size_bytes, source",
+        )?;
+        let order =
+            parse_optional_enum::<generated::types::SortOrder>(order, "--order", "asc, desc")?;
+
+        let response = map_generated_result(
+            self.inner
+                .list_files(
+                    connector_id,
+                    cursor,
+                    filename,
+                    parse_limit(limit)?,
+                    order,
+                    run_id,
+                    sort,
+                    source,
+                )
+                .await,
+        )
+        .await?;
+
+        to_json_value(response)
+    }
+
+    #[instrument(name = "cli.api.get_file", skip_all, fields(file_id), err)]
+    pub async fn get_file(&self, file_id: &str) -> Result<Value, ApiError> {
+        let response = map_generated_result(self.inner.retrieve_file(file_id).await).await?;
+
+        to_json_value(response)
+    }
+
+    #[instrument(name = "cli.api.upload_file", skip_all, fields(name, size_bytes), err)]
+    pub async fn upload_file(
+        &self,
+        name: &str,
+        content_type: &str,
+        bytes: Vec<u8>,
+    ) -> Result<Value, ApiError> {
+        let request =
+            serde_json::from_value::<generated::types::InitiateFileUploadRequest>(json!({
+                "name": name,
+                "size_bytes": bytes.len() as u64,
+                "content_type": content_type,
+            }))
+            .map_err(|error| ApiError::InvalidArgument(format!("invalid file upload: {error}")))?;
+
+        let initiated =
+            map_generated_result(self.inner.initiate_file_upload(&request).await).await?;
+
+        let storage = storage_http_client()?;
+        let mut put = storage.put(&initiated.upload_url).body(bytes);
+        for (header_name, header_value) in &initiated.upload_headers {
+            put = put.header(header_name.as_str(), header_value.as_str());
+        }
+
+        let upload_response = put.send().await?;
+        let upload_status = upload_response.status();
+        if !upload_status.is_success() {
+            let upload_bytes = upload_response.bytes().await.unwrap_or_default();
+            return Err(http_error_from_bytes(upload_status, &upload_bytes));
+        }
+
+        match self.finalize_file(&initiated.file_id).await {
+            Ok(value) => Ok(value),
+            Err(error) => Err(ApiError::InvalidRequest(format!(
+                "uploaded bytes for `{}` but finalize failed: {error}",
+                initiated.file_id
+            ))),
+        }
+    }
+
+    #[instrument(name = "cli.api.finalize_file", skip_all, fields(file_id), err)]
+    pub async fn finalize_file(&self, file_id: &str) -> Result<Value, ApiError> {
+        let response = map_generated_result(self.inner.complete_file_upload(file_id).await).await?;
+
+        to_json_value(response)
+    }
+
+    #[instrument(name = "cli.api.delete_file", skip_all, fields(file_id), err)]
+    pub async fn delete_file(&self, file_id: &str) -> Result<Value, ApiError> {
+        let response = map_generated_result(self.inner.delete_file(file_id).await).await?;
+
+        to_json_value(response)
+    }
+
+    #[instrument(name = "cli.api.get_file_download_url", skip_all, fields(file_id), err)]
+    pub async fn get_file_download_url(&self, file_id: &str) -> Result<Value, ApiError> {
+        let response =
+            map_generated_result(self.inner.get_file_download_url(file_id).await).await?;
+
+        to_json_value(response)
+    }
+
+    #[instrument(name = "cli.api.download_file_bytes", skip_all, fields(file_id), err)]
+    pub async fn download_file_bytes(&self, file_id: &str) -> Result<Vec<u8>, ApiError> {
+        let download =
+            map_generated_result(self.inner.get_file_download_url(file_id).await).await?;
+        let storage = storage_http_client()?;
+        let response = storage.get(&download.url).send().await?;
+        let status = response.status();
+        let bytes = response.bytes().await?;
+
+        if !status.is_success() {
+            return Err(http_error_from_bytes(status, &bytes));
+        }
+
+        Ok(bytes.to_vec())
+    }
+
+    #[instrument(name = "cli.api.list_capture_sessions", skip_all, err)]
+    pub async fn list_capture_sessions(&self) -> Result<Value, ApiError> {
+        let response = map_generated_result(self.inner.list_capture_sessions().await).await?;
+
+        to_json_value(response)
+    }
+
+    #[instrument(name = "cli.api.start_capture_session", skip_all, err)]
+    pub async fn start_capture_session(
+        &self,
+        use_proxy: bool,
+        cookies: Option<Value>,
+    ) -> Result<Value, ApiError> {
+        let cookies = if let Some(cookies) = cookies {
+            serde_json::from_value::<Vec<generated::types::SessionCookie>>(cookies).map_err(
+                |error| ApiError::InvalidArgument(format!("invalid --cookies payload: {error}")),
+            )?
+        } else {
+            Vec::new()
+        };
+
+        let request = generated::types::StartCaptureSessionRequest { cookies, use_proxy };
+        let response =
+            map_generated_result(self.inner.start_capture_session(&request).await).await?;
+
+        to_json_value(response)
+    }
+
+    #[instrument(name = "cli.api.get_capture_session", skip_all, fields(id), err)]
+    pub async fn get_capture_session(&self, capture_session_id: &str) -> Result<Value, ApiError> {
+        let response = map_generated_result(
+            self.inner
+                .retrieve_capture_session(capture_session_id)
+                .await,
+        )
+        .await?;
+
+        to_json_value(response)
+    }
+
+    #[instrument(name = "cli.api.complete_capture_session", skip_all, fields(id), err)]
+    pub async fn complete_capture_session(
+        &self,
+        capture_session_id: &str,
+    ) -> Result<Value, ApiError> {
+        let response = map_generated_result(
+            self.inner
+                .complete_capture_session(capture_session_id)
+                .await,
+        )
+        .await?;
+
+        to_json_value(response)
+    }
+
+    #[instrument(name = "cli.api.abandon_capture_session", skip_all, fields(id), err)]
+    pub async fn abandon_capture_session(
+        &self,
+        capture_session_id: &str,
+    ) -> Result<Value, ApiError> {
+        let response =
+            map_generated_result(self.inner.abandon_capture_session(capture_session_id).await)
+                .await?;
+
+        to_json_value(response)
+    }
+
+    #[instrument(name = "cli.api.create_string_secret", skip_all, fields(name), err)]
+    pub async fn create_string_secret(
+        &self,
+        name: &str,
+        value: &str,
+        website: Option<&str>,
+    ) -> Result<Value, ApiError> {
         let request = generated::types::CreateSecretRequest {
             name: name.to_string(),
             password: None,
@@ -291,9 +472,38 @@ impl ApiClient {
             totp_secret: None,
             username: None,
             value: Some(value.to_string()),
-            website: None,
+            website: website.map(ToOwned::to_owned),
         };
 
+        self.create_secret_request(request).await
+    }
+
+    #[instrument(name = "cli.api.create_login_secret", skip_all, fields(name), err)]
+    pub async fn create_login_secret(
+        &self,
+        name: &str,
+        username: &str,
+        password: &str,
+        totp_secret: Option<&str>,
+        website: Option<&str>,
+    ) -> Result<Value, ApiError> {
+        let request = generated::types::CreateSecretRequest {
+            name: name.to_string(),
+            password: Some(password.to_string()),
+            secret_type: generated::types::SecretType::Login,
+            totp_secret: totp_secret.map(ToOwned::to_owned),
+            username: Some(username.to_string()),
+            value: None,
+            website: website.map(ToOwned::to_owned),
+        };
+
+        self.create_secret_request(request).await
+    }
+
+    async fn create_secret_request(
+        &self,
+        request: generated::types::CreateSecretRequest,
+    ) -> Result<Value, ApiError> {
         let response =
             map_generated_result(self.inner.create_secret_v1beta_secrets_post(&request).await)
                 .await?;
@@ -320,10 +530,83 @@ impl ApiClient {
 
         to_json_value(response)
     }
+
+    #[instrument(name = "cli.api.generate_totp", skip_all, fields(id), err)]
+    pub async fn generate_totp(&self, id: &str) -> Result<Value, ApiError> {
+        let response = map_generated_result(
+            self.inner
+                .generate_totp_code_v1beta_secrets_id_totp_post(id)
+                .await,
+        )
+        .await?;
+
+        to_json_value(response)
+    }
+
+    fn http_client_with_timeout(&self, timeout_seconds: u64) -> Result<reqwest::Client, ApiError> {
+        build_http_client(&default_api_headers(&self.options)?, timeout_seconds)
+    }
 }
 
 fn to_json_value<T: Serialize>(value: T) -> Result<Value, ApiError> {
     serde_json::to_value(value).map_err(|error| ApiError::Serialization(error.to_string()))
+}
+
+fn default_api_headers(options: &ClientOptions) -> Result<HeaderMap, ApiError> {
+    let mut headers = HeaderMap::new();
+    let mut auth_value = HeaderValue::from_str(&format!("Bearer {}", options.bearer_token))
+        .map_err(|_| {
+            ApiError::InvalidRequest("bearer token contains invalid header characters".to_string())
+        })?;
+    auth_value.set_sensitive(true);
+    headers.insert(AUTHORIZATION, auth_value);
+    headers.insert(
+        HeaderName::from_static(REQUEST_SOURCE_HEADER),
+        HeaderValue::from_static(REQUEST_SOURCE_CLI),
+    );
+    Ok(headers)
+}
+
+fn build_http_client(
+    headers: &HeaderMap,
+    timeout_seconds: u64,
+) -> Result<reqwest::Client, ApiError> {
+    Ok(reqwest::Client::builder()
+        .default_headers(headers.clone())
+        .timeout(Duration::from_secs(timeout_seconds))
+        .build()?)
+}
+
+fn storage_http_client() -> Result<reqwest::Client, ApiError> {
+    // Signed storage URLs must be fetched without the Indices API key.
+    Ok(reqwest::Client::builder()
+        .timeout(Duration::from_secs(3600))
+        .build()?)
+}
+
+fn parse_limit(limit: Option<u32>) -> Result<Option<NonZeroU64>, ApiError> {
+    match limit {
+        None => Ok(None),
+        Some(0) => Err(ApiError::InvalidArgument(
+            "`--limit` must be at least 1".to_string(),
+        )),
+        Some(value) => Ok(NonZeroU64::new(u64::from(value))),
+    }
+}
+
+fn parse_optional_enum<T: FromStr>(
+    value: Option<&str>,
+    flag: &str,
+    expected: &str,
+) -> Result<Option<T>, ApiError> {
+    match value {
+        None => Ok(None),
+        Some(raw) => raw.parse::<T>().map(Some).map_err(|_| {
+            ApiError::InvalidArgument(format!(
+                "invalid {flag} `{raw}`; expected one of: {expected}"
+            ))
+        }),
+    }
 }
 
 /// Unwraps a generated-client result, mapping any error through

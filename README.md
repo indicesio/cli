@@ -18,7 +18,7 @@ You can customise the install command, if you wish:
 
 ```bash
 # Install a specific version:
-curl -fsSL https://get.indices.io | sh -s -- --version 0.1.0
+curl -fsSL https://get.indices.io | sh -s -- --version 0.2.0
 
 # Install to a custom directory:
 curl -fsSL https://get.indices.io | sh -s -- --install-dir /usr/local/bin --yes
@@ -46,25 +46,51 @@ indices login
 indices login --api-key
 indices login --api-key "idx_..."
 indices whoami
-indices tasks list
-indices tasks create --display-name "Apply Job" --task "Fill the form on example.com"
-indices runs create --task-id "<task-uuid>" --arguments '{"job_id":"123"}'
-indices runs list --task-id <task-uuid>
-indices runs get <run-uuid>
-indices runs logs <run-uuid>
+
+indices connectors list
+indices connectors list --domain example.com
+indices connectors get <connector-id>
+indices connectors rename <connector-id> --display-name "Invoice retrieval"
+indices connectors revisions <connector-id>
+indices connectors delete <connector-id>
+
+indices runs create --connector-id "<connector-id>" --arguments '{"job_id":"123"}'
+indices runs create --connector-id "<connector-id>" --async
+indices runs list --connector-id <connector-id>
+indices runs get <run-id>
+indices runs logs <run-id>
+
+indices files list --run-id <run-id>
+indices files upload ./report.pdf
+indices files get <file-id>
+indices files download <file-id> --output ./report.pdf
+indices files download-url <file-id>
+indices files delete <file-id>
+
+indices captures start
+indices captures get <capture-session-id>
+indices captures complete <capture-session-id>
+indices captures abandon <capture-session-id>
+indices captures list
+
 indices secrets create OPENAI_API_KEY --value "sk-..."
+indices secrets create STORE_LOGIN --type login --username "user" --password "..."
 indices secrets list
+indices secrets totp <secret-id>
 indices secrets delete <secret-id>
 ```
 
 Commands render Markdown by default. Use `--json` on any command for JSON output.
 
 Create methods support:
-- Argument mode by default (for example, `--task-id`, `--display-name`, `--task`)
+- Argument mode by default (for example, `--connector-id`, `--arguments`)
 - Piped JSON from stdin:
   - `cat payload.json | indices runs create`
-  - `cat payload.json | indices tasks create`
 - Explicit JSON payload sources: `--body`, `--file`, or `--stdin`
+
+Connectors are created and revised in the [Indices dashboard](https://platform.indices.io). The CLI lists, inspects, runs, and manages them.
+
+`indices tasks` has been removed. Use `indices connectors` and `indices runs create --connector-id` instead.
 
 ## Config
 

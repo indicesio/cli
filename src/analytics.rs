@@ -9,7 +9,9 @@ use serde_json::{Map, Value, json};
 use tracing::warn;
 use uuid::Uuid;
 
-use crate::cli::{Cli, Command, RunsCommand, SecretsCommand, TasksCommand};
+use crate::cli::{
+    CapturesCommand, Cli, Command, ConnectorsCommand, FilesCommand, RunsCommand, SecretsCommand,
+};
 use crate::config::StoredSession;
 
 const POSTHOG_API_KEY: &str = "phc_jVpGaCd1oWZEsWxv5KHfmNacUjOp5VT4yhNJAnpBiok";
@@ -199,13 +201,12 @@ pub fn route_for_command(command: &Command) -> &'static str {
         Command::Login(_) => "auth.login",
         Command::Logout => "auth.logout",
         Command::Whoami => "auth.whoami",
-        Command::Tasks { command } => match command {
-            TasksCommand::Create(_) => "tasks.create",
-            TasksCommand::Get(_) => "tasks.get",
-            TasksCommand::List(_) => "tasks.list",
-            TasksCommand::Delete(_) => "tasks.delete",
-            TasksCommand::Retry(_) => "tasks.retry",
-            TasksCommand::RegenerateApi(_) => "tasks.regenerate_api",
+        Command::Connectors { command } => match command {
+            ConnectorsCommand::List(_) => "connectors.list",
+            ConnectorsCommand::Get(_) => "connectors.get",
+            ConnectorsCommand::Rename(_) => "connectors.rename",
+            ConnectorsCommand::Delete(_) => "connectors.delete",
+            ConnectorsCommand::Revisions(_) => "connectors.revisions",
         },
         Command::Runs { command } => match command {
             RunsCommand::Create(_) => "runs.create",
@@ -213,11 +214,29 @@ pub fn route_for_command(command: &Command) -> &'static str {
             RunsCommand::Get(_) => "runs.get",
             RunsCommand::Logs(_) => "runs.logs",
         },
+        Command::Files { command } => match command {
+            FilesCommand::List(_) => "files.list",
+            FilesCommand::Get(_) => "files.get",
+            FilesCommand::Upload(_) => "files.upload",
+            FilesCommand::Finalize(_) => "files.finalize",
+            FilesCommand::Delete(_) => "files.delete",
+            FilesCommand::DownloadUrl(_) => "files.download_url",
+            FilesCommand::Download(_) => "files.download",
+        },
+        Command::Captures { command } => match command {
+            CapturesCommand::Start(_) => "captures.start",
+            CapturesCommand::List => "captures.list",
+            CapturesCommand::Get(_) => "captures.get",
+            CapturesCommand::Complete(_) => "captures.complete",
+            CapturesCommand::Abandon(_) => "captures.abandon",
+        },
         Command::Secrets { command } => match command {
             SecretsCommand::Create(_) => "secrets.create",
             SecretsCommand::List => "secrets.list",
             SecretsCommand::Delete(_) => "secrets.delete",
+            SecretsCommand::Totp(_) => "secrets.totp",
         },
+        Command::Tasks { .. } => "tasks.removed",
     }
 }
 
@@ -226,13 +245,12 @@ fn command_name(command: &Command) -> &'static str {
         Command::Login(_) => "login",
         Command::Logout => "logout",
         Command::Whoami => "whoami",
-        Command::Tasks { command } => match command {
-            TasksCommand::Create(_) => "tasks create",
-            TasksCommand::Get(_) => "tasks get",
-            TasksCommand::List(_) => "tasks list",
-            TasksCommand::Delete(_) => "tasks delete",
-            TasksCommand::Retry(_) => "tasks retry",
-            TasksCommand::RegenerateApi(_) => "tasks regenerate-api",
+        Command::Connectors { command } => match command {
+            ConnectorsCommand::List(_) => "connectors list",
+            ConnectorsCommand::Get(_) => "connectors get",
+            ConnectorsCommand::Rename(_) => "connectors rename",
+            ConnectorsCommand::Delete(_) => "connectors delete",
+            ConnectorsCommand::Revisions(_) => "connectors revisions",
         },
         Command::Runs { command } => match command {
             RunsCommand::Create(_) => "runs create",
@@ -240,11 +258,29 @@ fn command_name(command: &Command) -> &'static str {
             RunsCommand::Get(_) => "runs get",
             RunsCommand::Logs(_) => "runs logs",
         },
+        Command::Files { command } => match command {
+            FilesCommand::List(_) => "files list",
+            FilesCommand::Get(_) => "files get",
+            FilesCommand::Upload(_) => "files upload",
+            FilesCommand::Finalize(_) => "files finalize",
+            FilesCommand::Delete(_) => "files delete",
+            FilesCommand::DownloadUrl(_) => "files download-url",
+            FilesCommand::Download(_) => "files download",
+        },
+        Command::Captures { command } => match command {
+            CapturesCommand::Start(_) => "captures start",
+            CapturesCommand::List => "captures list",
+            CapturesCommand::Get(_) => "captures get",
+            CapturesCommand::Complete(_) => "captures complete",
+            CapturesCommand::Abandon(_) => "captures abandon",
+        },
         Command::Secrets { command } => match command {
             SecretsCommand::Create(_) => "secrets create",
             SecretsCommand::List => "secrets list",
             SecretsCommand::Delete(_) => "secrets delete",
+            SecretsCommand::Totp(_) => "secrets totp",
         },
+        Command::Tasks { .. } => "tasks",
     }
 }
 
@@ -283,6 +319,10 @@ fn should_redact_flag(flag: &str) -> bool {
         flag,
         "--api-key"
             | "--value"
+            | "--password"
+            | "--username"
+            | "--totp-secret"
+            | "--cookies"
             | "--body"
             | "--arguments"
             | "--secret-bindings"

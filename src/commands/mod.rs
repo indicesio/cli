@@ -1,8 +1,10 @@
 pub mod auth;
+pub mod captures;
+pub mod connectors;
+pub mod files;
 pub mod payload;
 pub mod runs;
 pub mod secrets;
-pub mod tasks;
 
 use std::io::{self, Write};
 

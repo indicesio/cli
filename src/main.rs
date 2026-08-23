@@ -13,7 +13,7 @@ use serde_json::Value;
 use tracing::instrument;
 
 use crate::analytics::Analytics;
-use crate::cli::{Cli, Command};
+use crate::cli::{Cli, Command, TASKS_REMOVED_MESSAGE};
 use crate::client::{ApiClient, ClientOptions};
 use crate::commands::auth::WhoamiOutput;
 use crate::config::{ConfigStore, OutputMode, RuntimeConfig, RuntimeOverrides, StoredSession};
@@ -96,6 +96,10 @@ async fn execute_command(
             analytics.capture_command_start(telemetry).await;
             commands::auth::logout(config_store)?;
             Ok(())
+        }
+        Command::Tasks { .. } => {
+            analytics.capture_command_start(telemetry).await;
+            Err(CliError::Message(TASKS_REMOVED_MESSAGE.to_string()))
         }
         _ => {
             let runtime = config_store.resolve_runtime(overrides)?;
@@ -181,16 +185,22 @@ async fn execute_authenticated_command(
         Command::Whoami => Ok(CommandResponse::Whoami(
             commands::auth::whoami(client).await?,
         )),
-        Command::Tasks { command } => Ok(CommandResponse::Value(
-            commands::tasks::handle_tasks_command(client, command).await?,
+        Command::Connectors { command } => Ok(CommandResponse::Value(
+            commands::connectors::handle_connectors_command(client, command).await?,
         )),
         Command::Runs { command } => Ok(CommandResponse::Value(
             commands::runs::handle_runs_command(client, command).await?,
         )),
+        Command::Files { command } => Ok(CommandResponse::Value(
+            commands::files::handle_files_command(client, command).await?,
+        )),
+        Command::Captures { command } => Ok(CommandResponse::Value(
+            commands::captures::handle_captures_command(client, command).await?,
+        )),
         Command::Secrets { command } => Ok(CommandResponse::Value(
             commands::secrets::handle_secrets_command(client, command).await?,
         )),
-        Command::Login(_) | Command::Logout => {
+        Command::Login(_) | Command::Logout | Command::Tasks { .. } => {
             Err(CliError::Message("unexpected command routing".to_string()))
         }
     }

@@ -1,28 +1,29 @@
 ---
 name: indices
 description: >
-  Use this skill whenever the user wants to interact with a website – scraping data, filling forms, logging in, navigating flows, extracting structured information, or running any task a human would do in a browser.
+  Use Indices to retrieve data or perform actions on websites. Trigger when the user wants to scrape, log in, fill a form, download a file, poll a portal, or otherwise interact with a website as a human would in a browser.
 ---
 
 # Indices CLI
 
-Indices enables agents to perform actions on websites. Instead of using vision-based agents, it builds an API for a website, which you can then use to perform repeated (parameterised) actions, like scraping or polling for data or filling forms (both to retrieve dynamic data and to submit actions).
+Indices learns how a website works and exposes a deterministic connector you can call like an API.
+
+Users create connectors in the [dashboard](https://platform.indices.io). After that, this CLI can list them, inspect schemas, bind secrets, run them, and download any files they produce.
 
 Never interact with websites directly (curl, scraping, browser fetching). You are not capable of reliably doing this yourself. Always use Indices.
 
 ## When To Use
 
-Reach for Indices any time the goal involves a website and a human-like action:
+Use Indices when you need to:
 
-- **Extract data** — "Get the price, stock level, and reviews from this product page"
-- **Fill & submit forms** — "Apply to this job posting with my resume details"
-- **Log in and navigate** — "Check my account balance on this banking portal"
-- **Automate repetitive web flows** — "Do this across 50 URLs with different inputs each time"
-- **Interact with web UIs** — "Click through the checkout flow and confirm the order"
+- Extract structured data from a portal or SaaS UI
+- Fill and submit forms
+- Repeat the same flow with different arguments
+- Download files produced by a run, or upload files a connector needs
 
-If the task touches a website and would otherwise require a human to open a browser, Indices can likely do it.
+Indices is suitable when you could imagine a website having an API endpoint for the task (parameterisable or dynamic). It is not suitable for unstructured search.
 
-> **Note:** Indices is network-based — it can reach any website but does not have access to local files or desktop applications. It is also not suitable for unstructured search tasks (web search).
+> **Note:** Indices is network-based — it can reach any website but does not have access to local files or desktop applications unless you upload them with `indices files upload`.
 
 ---
 
@@ -39,7 +40,7 @@ In subsequent commands, do **not** use full paths like `~/.local/bin/indices` �
 ### Install
 
 ```bash
-curl -fsSL https://indices.io/install.sh | bash
+curl -fsSL https://get.indices.io | sh
 npx skills add indicesio/cli
 ```
 
@@ -54,7 +55,7 @@ Installs to `~/.local/bin`. If `indices` isn't found after install, add `~/.loca
 
 ```bash
 indices login --api-key "<your-api-key>"    # non-interactive
-indices login                               # prompts securely
+indices login                               # browser OAuth, or prompts for an API key with --api-key
 indices whoami                              # verify stored credentials
 ```
 
@@ -63,25 +64,29 @@ indices whoami                              # verify stored credentials
 ## Quick Start
 
 ```bash
-# 1. Create a task
-indices tasks create \
-  --display-name "Scrape product price" \
-  --task "On example.com, find the current price of the item with the given product ID"
+# 1. Look for an existing connector
+indices connectors list
+indices connectors list --domain example.com
+indices connectors get <connector-id>       # inspect input_schema, output_schema, required_secrets
 
-# You'll need to show an example once.\
-# Ask the user to perform it in the embedded browser. A URL is returned by the `indices tasks create` command.
+# If none exists, ask the user to create one in the dashboard:
+# https://platform.indices.io
 
-# 2. Wait for the task to become ready
-indices tasks get <task-uuid>              # repeat until current_state == "ready"
+# 2. Bind secrets if required_secrets is non-empty
+indices secrets list
+indices secrets create STORE_LOGIN --type login --username "user" --password "..."
 
 # 3. Run it
 indices runs create \
-  --task-id "<task-uuid>" \
-  --arguments '{"product_id":"ABC123"}'
+  --connector-id "<connector-id>" \
+  --arguments '{"product_id":"ABC123"}' \
+  --secret-bindings '{"LOGIN":"<secret-id>"}'
 
-# 4. Inspect results
-indices runs get <run-uuid>
-indices runs logs <run-uuid>
+# 4. Inspect results and any output files
+indices runs get <run-id>
+indices runs logs <run-id>
+indices files list --run-id <run-id>
+indices files download <file-id>
 ```
 
 ---
@@ -93,7 +98,7 @@ Available on every command:
 | Flag | Default | Description |
 |---|---|---|
 | `--json` | off | Emit JSON instead of Markdown (for scripting) |
-| `--timeout <seconds>` | `30` | Request timeout |
+| `--timeout <seconds>` | `30` | Request timeout. Sync `runs create` automatically extends this to `--max-timeout-s` plus a buffer. |
 
 Never use `--output json`; this CLI uses the global `--json` flag instead.
 
@@ -104,79 +109,38 @@ When exact flags matter, verify them with `indices <command> --help`.
 ## Auth
 
 ```bash
-indices login                          # prompts securely for API key
+indices login                          # browser OAuth
+indices login --api-key                # prompts securely for API key
 indices login --api-key "<key>"        # non-interactive
 indices whoami                         # verify stored credentials
-indices logout                         # remove stored API key
+indices logout                         # remove stored credentials
 ```
 
 ---
 
-## Tasks
+## Connectors
 
-### Step 1: Check for Existing Tasks First
+Connectors are created in the [dashboard](https://platform.indices.io), not by this CLI. In the dashboard the user demonstrates the task once so Indices can learn it.
 
-Before creating anything, always check if there are already tasks that can accomplish the user's goal. A single existing task might do the job, or you may be able to chain multiple existing tasks together.
+### 1. Check for existing connectors first
 
 ```bash
-indices tasks list
-indices tasks list --status ready
-indices tasks get <task-uuid>   # inspect a specific task's details
+indices connectors list
+indices connectors list --domain example.com
+indices connectors list --limit 20 --cursor "<next_cursor>"
+indices connectors get <connector-id>
+indices connectors revisions <connector-id>
 ```
 
-If you find usable existing tasks in `ready` state, skip straight to creating a run (see **Runs** below). Think creatively — the user's request might map to a sequence of existing tasks rather than a brand-new one. Or if they want to apply for a job on a specific website that happens to use Workable, then a general "Workable - Apply for job" task will work.
+If a usable connector exists, skip to **Runs**. Think in sequences — the request may map to a chain of existing connectors.
 
-### Step 2: Create a New Task (if needed)
+If no connector exists but the workload is repeatable, ask the user to create one in the dashboard. Do not scrape the site yourself.
 
-If no existing task fits, create a new one. The required fields are:
-
-- **`--display-name`** — a short human-readable label
-- **`--task`** — a natural-language description of what to do
+### 2. Other connector commands
 
 ```bash
-indices tasks create \
-  --display-name "Apply to jobs" \
-  --task "Fill and submit the application form on jobs.example.com"
-```
-
-If the task involves logging into a site, create a secret first (see **Secrets** below) so credentials aren't passed as plain arguments.
-
-### Step 3: Show Indices How It's Done
-
-After creation, the task will almost always enter the `waiting_for_manual_completion` state. This is expected and normal — it means Indices needs the user to **demonstrate the task once** in the browser so it can learn how to repeat it automatically.
-
-When this happens, direct the user to open the task in their browser:
-
-> To get this set up, please do the task once in a browser on the Indices Platform, to show us how it's done:
-> **https://platform.indices.io/tasks/{task_id}**
->
-> Once you've finished, come back here and I'll take it from there.
-
-Present this as a natural part of the setup, not as an error or unusual state. The user just needs to show the task being performed once.
-
-### Step 4: Wait for the Task to Become Ready
-
-After the user completes the demonstration in the browser, the task needs a few minutes to process. This typically takes **up to 5 minutes**, though occasionally longer.
-
-Poll `indices tasks get <task-uuid>` to check progress. If your environment supports it, poll in the background so the user isn't left staring at a spinner. A reasonable polling interval is every 30 seconds.
-
-```bash
-indices tasks get <task-uuid>   # check current_state
-```
-
-Possible states:
-- **`waiting_for_manual_completion`** — still waiting for the user to demonstrate in browser
-- **`not_ready`** — demonstration complete, task is being processed; keep polling
-- **`ready`** — good to go, proceed to creating runs
-- **`failed`** — inspect failure details; consider `indices tasks retry <task-uuid>` or recreating
-
-Once `current_state` is `ready`, the task is fully set up and can be run as many times as needed with different inputs.
-
-### Other Task Commands
-
-```bash
-indices tasks retry <task-uuid>
-indices tasks delete <task-uuid> --yes
+indices connectors rename <connector-id> --display-name "Invoice retrieval"
+indices connectors delete <connector-id> --yes
 ```
 
 ---
@@ -187,17 +151,19 @@ indices tasks delete <task-uuid> --yes
 
 ```bash
 indices runs create \
-  --task-id "<task-uuid>" \
+  --connector-id "<connector-id>" \
   --arguments '{"key":"value"}' \
-  --secret-bindings '{"login":"<secret-id>"}'
+  --secret-bindings '{"LOGIN":"<secret-id>"}'
 ```
 
-Flags: `--task-id` (required), `--arguments <json-object>`, `--secret-bindings <json-object>`
+Flags: `--connector-id` (required in argument mode), `--arguments <json-object>`, `--secret-bindings <json-object>`, `--async`, `--max-timeout-s <seconds>`
+
+By default the command blocks until the run finishes (up to 300s). Pass `--async` to return immediately, then poll `indices runs get <run-id>` until `status` is terminal: `success`, `connector_error`, `timed_out`, `result_too_large`, or `internal_error`.
 
 JSON input alternative:
 
 ```bash
-indices runs create --body '{"task_id":"<uuid>","arguments":{"key":"value"}}'
+indices runs create --body '{"connector_id":"<id>","arguments":{"key":"value"}}'
 indices runs create --file ./run.json
 cat run.json | indices runs create
 ```
@@ -207,11 +173,13 @@ Rules: use at most one of `--body`, `--file`, `--stdin`; do not mix with argumen
 ### List / Get / Logs
 
 ```bash
-indices runs list --task-id <task-uuid>           # --task-id is required
-indices runs list --task-id <task-uuid> --limit 20
-indices runs get <run-uuid>
-indices runs logs <run-uuid>
+indices runs list --connector-id <connector-id>
+indices runs list --connector-id <connector-id> --limit 20 --cursor "<next_cursor>"
+indices runs get <run-id>
+indices runs logs <run-id>
 ```
+
+On `connector_error`, `error` has the machine-readable type, message, and optional details. When `has_logs` is true, call `indices runs logs`. Files produced by a run are listed with `indices files list --run-id <run-id>`.
 
 ---
 
@@ -220,14 +188,63 @@ indices runs logs <run-uuid>
 Use secrets to pass credentials (logins, API keys) to runs without exposing them in arguments.
 
 ```bash
-indices secrets create MY_SECRET --value "..."    # explicit value
+indices secrets create MY_SECRET --value "..."                 # string secret
 echo "..." | indices secrets create MY_SECRET --stdin
-indices secrets create MY_SECRET                  # prompts securely
+indices secrets create MY_SECRET                               # prompts securely
+indices secrets create STORE_LOGIN --type login --username "user" --password "..."
+indices secrets create STORE_LOGIN --type login --username "user" --totp-secret "BASE32..." --website "https://shop.example.com"
 indices secrets list
+indices secrets totp <secret-id>
 indices secrets delete <secret-id> --yes
 ```
 
-Empty secret values are rejected. Reference secrets in runs via `--secret-bindings '{"binding_name":"<secret-id>"}'`.
+Empty secret values are rejected. Never print passwords, string values, or TOTP seeds.
+
+If a connector's `required_secrets` is non-empty:
+
+1. List existing secrets (metadata only).
+2. Reuse a matching secret, or create one.
+3. Pass `--secret-bindings '{"<slot.name>":"<secret.id>"}'`. Every required slot must be bound.
+
+---
+
+## Files
+
+Uploads and run outputs.
+
+```bash
+indices files list
+indices files list --run-id <run-id>
+indices files list --connector-id <connector-id> --source RUN_OUTPUT
+indices files get <file-id>
+indices files upload ./invoice.pdf
+indices files upload ./data.csv --name "report.csv" --content-type text/csv
+indices files download-url <file-id>
+indices files download <file-id>
+indices files download <file-id> --output ./invoice.pdf --yes
+indices files finalize <file-id>          # if an upload PUT succeeded but finalize failed
+indices files delete <file-id> --yes
+```
+
+`download-url` returns a short-lived signed URL. Fetch that URL with a plain HTTP GET; do not send the Indices API key to storage. Prefer `indices files download` when you need the bytes locally.
+
+---
+
+## Capture sessions
+
+A capture session is a browser that records its network traffic. Completed recordings can be used in the dashboard to build or revise a connector.
+
+```bash
+indices captures start
+indices captures start --use-proxy
+indices captures start --cookies '[{"name":"sid","value":"abc","domain":"example.com"}]'
+indices captures get <capture-session-id>
+indices captures complete <capture-session-id>
+indices captures list
+indices captures abandon <capture-session-id>
+```
+
+After `start`, give the user the `iframe_url` so they can perform the workflow. Then `complete` and poll `get` until `state` is `completed`. Completion is asynchronous (`completing` → `completed`).
 
 ---
 
@@ -235,6 +252,9 @@ Empty secret values are rejected. Reference secrets in runs via `--secret-bindin
 
 | Symptom | Fix |
 |---|---|
-| `command not found: indices` | Run `curl -fsSL https://indices.io/install.sh \| bash` to install, then add `~/.local/bin` to PATH (see Install section) |
-| Task stuck in `not_ready` | Normal — keep polling `indices tasks get <task-uuid>` every 30s; can take up to 5-10 minutes |
-| Task in `waiting_for_manual_completion` | User needs to demonstrate the task at `https://platform.indices.io/tasks/{task_id}` |
+| `command not found: indices` | Run `curl -fsSL https://get.indices.io \| sh` to install, then add `~/.local/bin` to PATH (see Install section) |
+| `tasks` command not found / removed | Use `indices connectors` and `indices runs create --connector-id` |
+| No connector for the website | Ask the user to create one at https://platform.indices.io |
+| Run `status` is `pending` or `running` | Poll `indices runs get <run-id>` |
+| Run `connector_error` | Read `error` on the run; fetch logs if `has_logs` is true |
+| Need files from a run | `indices files list --run-id <run-id>` then `indices files download <file-id>` |
