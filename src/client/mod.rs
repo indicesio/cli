@@ -414,7 +414,7 @@ impl ApiClient {
 
         let request = generated::types::StartCaptureSessionRequest { cookies, use_proxy };
         let response =
-            map_generated_result(self.inner.start_capture_session(&request).await).await?;
+            map_generated_result(self.inner.start_capture_session(Some(&request)).await).await?;
 
         to_json_value(response)
     }
@@ -745,8 +745,9 @@ fn summarize_error_payload(raw: &str) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{ApiError, http_error_from_bytes, summarize_error_payload};
+    use super::{ApiError, generated, http_error_from_bytes, summarize_error_payload};
     use reqwest::StatusCode;
+    use serde_json::json;
 
     #[test]
     fn summarize_error_payload_prefers_detail_string() {
@@ -823,5 +824,94 @@ mod tests {
             }
             other => panic!("expected http status error, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn deserializes_successful_run_with_null_error() {
+        // Production `GET /v1beta/runs` returns `"error": null` on success.
+        // The generated `Run` type must treat that as optional, not a struct.
+        let raw = json!({
+            "id": "run_0345GkDvQ2e7hQlOxQEp9x",
+            "connector_id": "conn_03439sp4kVIQkCJy0pMhlG",
+            "arguments": {
+                "adults": 2,
+                "listing_id": "1161267476226972345"
+            },
+            "secret_bindings": {},
+            "status": "success",
+            "result_json": "{\"ok\":true}",
+            "error": null,
+            "has_logs": true,
+            "created_at": "2026-08-11T11:27:44.888045Z",
+            "finished_at": "2026-08-11T11:27:47.039121Z"
+        });
+
+        let run: generated::types::Run =
+            serde_json::from_value(raw).expect("success run with null error should parse");
+        assert!(run.error.is_none());
+        assert_eq!(run.status, generated::types::RunStatus::Success);
+        assert_eq!(run.result_json.as_deref(), Some(r#"{"ok":true}"#));
+    }
+
+    #[test]
+    fn deserializes_connector_error_run() {
+        let raw = json!({
+            "id": "run_errorExample00000000001",
+            "connector_id": "conn_03439sp4kVIQkCJy0pMhlG",
+            "arguments": {},
+            "secret_bindings": {},
+            "status": "connector_error",
+            "result_json": null,
+            "error": {
+                "type": "site_changed",
+                "message": "listing page layout changed",
+                "retryable": false,
+                "exception": null,
+                "details": {"selector": ".listing-title"}
+            },
+            "has_logs": true,
+            "created_at": "2026-08-11T11:27:44.888045Z",
+            "finished_at": "2026-08-11T11:27:47.039121Z"
+        });
+
+        let run: generated::types::Run =
+            serde_json::from_value(raw).expect("connector_error run should parse");
+        let error = run.error.expect("error object should be present");
+        assert_eq!(error.type_, "site_changed");
+        assert_eq!(error.message, "listing page layout changed");
+        assert_eq!(error.retryable, Some(false));
+        assert_eq!(run.status, generated::types::RunStatus::ConnectorError);
+    }
+
+    #[test]
+    fn deserializes_list_runs_response_with_null_errors() {
+        let raw = json!({
+            "data": [
+                {
+                    "id": "run_0345GkDvQ2e7hQlOxQEp9x",
+                    "connector_id": "conn_03439sp4kVIQkCJy0pMhlG",
+                    "arguments": {},
+                    "secret_bindings": {},
+                    "status": "success",
+                    "result_json": "{}",
+                    "error": null,
+                    "has_logs": false,
+                    "created_at": "2026-08-11T11:27:44.888045Z",
+                    "finished_at": "2026-08-11T11:27:47.039121Z"
+                }
+            ],
+            "has_more": true,
+            "next_cursor": "run_0345GkDvQ2e7hQlOxQEp9x"
+        });
+
+        let page: generated::types::ListRunsResponse =
+            serde_json::from_value(raw).expect("list runs page should parse");
+        assert_eq!(page.data.len(), 1);
+        assert!(page.data[0].error.is_none());
+        assert!(page.has_more);
+        assert_eq!(
+            page.next_cursor.as_deref(),
+            Some("run_0345GkDvQ2e7hQlOxQEp9x")
+        );
     }
 }
