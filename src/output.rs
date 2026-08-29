@@ -17,6 +17,7 @@ const PRIORITY_KEYS: &[&str] = &[
     "current_state",
     "state",
     "status",
+    "error",
     "source",
     "success",
     "has_logs",
@@ -242,4 +243,26 @@ fn print_whoami_pretty(output: &WhoamiOutput) {
     }
 
     println!("{GREY}Run {CYAN}indices logout{GREY} to log out{RESET}");
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::ordered_keys;
+
+    #[test]
+    fn run_error_renders_after_status() {
+        let value = json!({
+            "id": "run_1",
+            "status": "success",
+            "error": null,
+            "result_json": "{}"
+        });
+        let keys = ordered_keys(value.as_object().expect("object"));
+        assert_eq!(
+            keys.iter().position(|k| k == "status").unwrap() + 1,
+            keys.iter().position(|k| k == "error").unwrap()
+        );
+    }
 }
