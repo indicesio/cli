@@ -839,7 +839,7 @@ mod tests {
             },
             "secret_bindings": {},
             "status": "success",
-            "result_json": "{\"ok\":true}",
+            "result": {"ok": true},
             "error": null,
             "has_logs": true,
             "created_at": "2026-08-11T11:27:44.888045Z",
@@ -850,7 +850,10 @@ mod tests {
             serde_json::from_value(raw).expect("success run with null error should parse");
         assert!(run.error.is_none());
         assert_eq!(run.status, generated::types::RunStatus::Success);
-        assert_eq!(run.result_json.as_deref(), Some(r#"{"ok":true}"#));
+        assert_eq!(
+            serde_json::to_value(&run.result).expect("result should serialize"),
+            json!({"ok": true})
+        );
     }
 
     #[test]
@@ -861,7 +864,7 @@ mod tests {
             "arguments": {},
             "secret_bindings": {},
             "status": "connector_error",
-            "result_json": null,
+            "result": null,
             "error": {
                 "type": "site_changed",
                 "message": "listing page layout changed",
@@ -881,6 +884,10 @@ mod tests {
         assert_eq!(error.message, "listing page layout changed");
         assert_eq!(error.retryable, Some(false));
         assert_eq!(run.status, generated::types::RunStatus::ConnectorError);
+        assert_eq!(
+            serde_json::to_value(&run.result).expect("result should serialize"),
+            json!(null)
+        );
     }
 
     #[test]
@@ -893,7 +900,7 @@ mod tests {
                     "arguments": {},
                     "secret_bindings": {},
                     "status": "success",
-                    "result_json": "{}",
+                    "result": {},
                     "error": null,
                     "has_logs": false,
                     "created_at": "2026-08-11T11:27:44.888045Z",
@@ -908,6 +915,10 @@ mod tests {
             serde_json::from_value(raw).expect("list runs page should parse");
         assert_eq!(page.data.len(), 1);
         assert!(page.data[0].error.is_none());
+        assert_eq!(
+            serde_json::to_value(&page.data[0].result).expect("result should serialize"),
+            json!({})
+        );
         assert!(page.has_more);
         assert_eq!(
             page.next_cursor.as_deref(),

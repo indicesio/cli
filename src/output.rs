@@ -18,6 +18,7 @@ const PRIORITY_KEYS: &[&str] = &[
     "state",
     "status",
     "error",
+    "result",
     "source",
     "success",
     "has_logs",
@@ -257,12 +258,16 @@ mod tests {
             "id": "run_1",
             "status": "success",
             "error": null,
-            "result_json": "{}"
+            "result": {}
         });
         let keys = ordered_keys(value.as_object().expect("object"));
         assert_eq!(
             keys.iter().position(|k| k == "status").unwrap() + 1,
             keys.iter().position(|k| k == "error").unwrap()
+        );
+        assert_eq!(
+            keys.iter().position(|k| k == "error").unwrap() + 1,
+            keys.iter().position(|k| k == "result").unwrap()
         );
     }
 }
