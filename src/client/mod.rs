@@ -2,6 +2,7 @@ pub mod generated;
 
 use std::num::NonZeroU64;
 use std::str::FromStr;
+use std::sync::Mutex;
 use std::time::Duration;
 
 use reqwest::StatusCode;
@@ -15,6 +16,40 @@ use crate::telemetry;
 
 const REQUEST_SOURCE_HEADER: &str = "x-indices-request-source";
 const REQUEST_SOURCE_CLI: &str = "cli";
+
+static LAST_RESPONSE_JSON: Mutex<Option<Value>> = Mutex::new(None);
+
+pub(crate) fn capture_response_json(value: Value) {
+    *LAST_RESPONSE_JSON
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(value);
+}
+
+pub(crate) async fn replay_json_response(
+    response: reqwest::Response,
+) -> reqwest::Result<reqwest::Response> {
+    let status = response.status();
+    let version = response.version();
+    let headers = response.headers().clone();
+    let bytes = response.bytes().await?;
+
+    if let Ok(value) = serde_json::from_slice(&bytes) {
+        capture_response_json(value);
+    }
+
+    let mut http_response = http::Response::new(bytes);
+    *http_response.status_mut() = status;
+    *http_response.version_mut() = version;
+    *http_response.headers_mut() = headers;
+    Ok(reqwest::Response::from(http_response))
+}
+
+fn take_captured_response_json() -> Option<Value> {
+    LAST_RESPONSE_JSON
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .take()
+}
 
 #[derive(Debug, Clone)]
 pub struct ClientOptions {
@@ -124,22 +159,17 @@ impl ApiClient {
         cursor: Option<&str>,
         domain: Option<&str>,
     ) -> Result<Value, ApiError> {
-        let response = map_generated_result(
+        map_generated_json(
             self.inner
                 .list_connectors(cursor, domain, parse_limit(limit)?)
                 .await,
         )
-        .await?;
-
-        to_json_value(response)
+        .await
     }
 
     #[instrument(name = "cli.api.get_connector", skip_all, fields(connector_id), err)]
     pub async fn get_connector(&self, connector_id: &str) -> Result<Value, ApiError> {
-        let response =
-            map_generated_result(self.inner.retrieve_connector(connector_id).await).await?;
-
-        to_json_value(response)
+        map_generated_json(self.inner.retrieve_connector(connector_id).await).await
     }
 
     #[instrument(name = "cli.api.rename_connector", skip_all, fields(connector_id), err)]
@@ -155,18 +185,12 @@ impl ApiClient {
             ApiError::InvalidArgument(format!("invalid connector display name: {error}"))
         })?;
 
-        let response =
-            map_generated_result(self.inner.update_connector(connector_id, &request).await).await?;
-
-        to_json_value(response)
+        map_generated_json(self.inner.update_connector(connector_id, &request).await).await
     }
 
     #[instrument(name = "cli.api.delete_connector", skip_all, fields(connector_id), err)]
     pub async fn delete_connector(&self, connector_id: &str) -> Result<Value, ApiError> {
-        let response =
-            map_generated_result(self.inner.delete_connector(connector_id).await).await?;
-
-        to_json_value(response)
+        map_generated_json(self.inner.delete_connector(connector_id).await).await
     }
 
     #[instrument(
@@ -176,10 +200,7 @@ impl ApiClient {
         err
     )]
     pub async fn list_connector_revisions(&self, connector_id: &str) -> Result<Value, ApiError> {
-        let response =
-            map_generated_result(self.inner.list_connector_revisions(connector_id).await).await?;
-
-        to_json_value(response)
+        map_generated_json(self.inner.list_connector_revisions(connector_id).await).await
     }
 
     #[instrument(name = "cli.api.list_runs", skip_all, fields(connector_id, limit), err)]
@@ -189,14 +210,12 @@ impl ApiClient {
         limit: Option<u32>,
         cursor: Option<&str>,
     ) -> Result<Value, ApiError> {
-        let response = map_generated_result(
+        map_generated_json(
             self.inner
                 .list_runs(connector_id, cursor, parse_limit(limit)?)
                 .await,
         )
-        .await?;
-
-        to_json_value(response)
+        .await
     }
 
     #[instrument(name = "cli.api.create_run", skip_all, err)]
@@ -240,25 +259,21 @@ impl ApiClient {
             return Err(http_error_from_bytes(status, &bytes));
         }
 
-        let run = serde_json::from_slice::<generated::types::Run>(&bytes).map_err(|error| {
+        let value = parse_json_value(&bytes)?;
+        serde_json::from_value::<generated::types::Run>(value.clone()).map_err(|error| {
             ApiError::Serialization(format!("invalid response payload: {error}"))
         })?;
-
-        to_json_value(run)
+        Ok(value)
     }
 
     #[instrument(name = "cli.api.get_run", skip_all, fields(run_id), err)]
     pub async fn get_run(&self, run_id: &str) -> Result<Value, ApiError> {
-        let response = map_generated_result(self.inner.retrieve_run(run_id).await).await?;
-
-        to_json_value(response)
+        map_generated_json(self.inner.retrieve_run(run_id).await).await
     }
 
     #[instrument(name = "cli.api.get_run_logs", skip_all, fields(run_id), err)]
     pub async fn get_run_logs(&self, run_id: &str) -> Result<Value, ApiError> {
-        let response = map_generated_result(self.inner.get_run_logs(run_id).await).await?;
-
-        to_json_value(response)
+        map_generated_json(self.inner.get_run_logs(run_id).await).await
     }
 
     #[instrument(name = "cli.api.list_files", skip_all, err)]
@@ -287,7 +302,7 @@ impl ApiClient {
         let order =
             parse_optional_enum::<generated::types::SortOrder>(order, "--order", "asc, desc")?;
 
-        let response = map_generated_result(
+        map_generated_json(
             self.inner
                 .list_files(
                     connector_id,
@@ -301,16 +316,12 @@ impl ApiClient {
                 )
                 .await,
         )
-        .await?;
-
-        to_json_value(response)
+        .await
     }
 
     #[instrument(name = "cli.api.get_file", skip_all, fields(file_id), err)]
     pub async fn get_file(&self, file_id: &str) -> Result<Value, ApiError> {
-        let response = map_generated_result(self.inner.retrieve_file(file_id).await).await?;
-
-        to_json_value(response)
+        map_generated_json(self.inner.retrieve_file(file_id).await).await
     }
 
     #[instrument(name = "cli.api.upload_file", skip_all, fields(name, size_bytes), err)]
@@ -355,24 +366,17 @@ impl ApiClient {
 
     #[instrument(name = "cli.api.finalize_file", skip_all, fields(file_id), err)]
     pub async fn finalize_file(&self, file_id: &str) -> Result<Value, ApiError> {
-        let response = map_generated_result(self.inner.complete_file_upload(file_id).await).await?;
-
-        to_json_value(response)
+        map_generated_json(self.inner.complete_file_upload(file_id).await).await
     }
 
     #[instrument(name = "cli.api.delete_file", skip_all, fields(file_id), err)]
     pub async fn delete_file(&self, file_id: &str) -> Result<Value, ApiError> {
-        let response = map_generated_result(self.inner.delete_file(file_id).await).await?;
-
-        to_json_value(response)
+        map_generated_json(self.inner.delete_file(file_id).await).await
     }
 
     #[instrument(name = "cli.api.get_file_download_url", skip_all, fields(file_id), err)]
     pub async fn get_file_download_url(&self, file_id: &str) -> Result<Value, ApiError> {
-        let response =
-            map_generated_result(self.inner.get_file_download_url(file_id).await).await?;
-
-        to_json_value(response)
+        map_generated_json(self.inner.get_file_download_url(file_id).await).await
     }
 
     #[instrument(name = "cli.api.download_file_bytes", skip_all, fields(file_id), err)]
@@ -393,9 +397,7 @@ impl ApiClient {
 
     #[instrument(name = "cli.api.list_capture_sessions", skip_all, err)]
     pub async fn list_capture_sessions(&self) -> Result<Value, ApiError> {
-        let response = map_generated_result(self.inner.list_capture_sessions().await).await?;
-
-        to_json_value(response)
+        map_generated_json(self.inner.list_capture_sessions().await).await
     }
 
     #[instrument(name = "cli.api.start_capture_session", skip_all, err)]
@@ -413,22 +415,17 @@ impl ApiClient {
         };
 
         let request = generated::types::StartCaptureSessionRequest { cookies, use_proxy };
-        let response =
-            map_generated_result(self.inner.start_capture_session(Some(&request)).await).await?;
-
-        to_json_value(response)
+        map_generated_json(self.inner.start_capture_session(Some(&request)).await).await
     }
 
     #[instrument(name = "cli.api.get_capture_session", skip_all, fields(id), err)]
     pub async fn get_capture_session(&self, capture_session_id: &str) -> Result<Value, ApiError> {
-        let response = map_generated_result(
+        map_generated_json(
             self.inner
                 .retrieve_capture_session(capture_session_id)
                 .await,
         )
-        .await?;
-
-        to_json_value(response)
+        .await
     }
 
     #[instrument(name = "cli.api.complete_capture_session", skip_all, fields(id), err)]
@@ -436,14 +433,12 @@ impl ApiClient {
         &self,
         capture_session_id: &str,
     ) -> Result<Value, ApiError> {
-        let response = map_generated_result(
+        map_generated_json(
             self.inner
                 .complete_capture_session(capture_session_id)
                 .await,
         )
-        .await?;
-
-        to_json_value(response)
+        .await
     }
 
     #[instrument(name = "cli.api.abandon_capture_session", skip_all, fields(id), err)]
@@ -451,11 +446,7 @@ impl ApiClient {
         &self,
         capture_session_id: &str,
     ) -> Result<Value, ApiError> {
-        let response =
-            map_generated_result(self.inner.abandon_capture_session(capture_session_id).await)
-                .await?;
-
-        to_json_value(response)
+        map_generated_json(self.inner.abandon_capture_session(capture_session_id).await).await
     }
 
     #[instrument(name = "cli.api.create_string_secret", skip_all, fields(name), err)]
@@ -504,43 +495,32 @@ impl ApiClient {
         &self,
         request: generated::types::CreateSecretRequest,
     ) -> Result<Value, ApiError> {
-        let response =
-            map_generated_result(self.inner.create_secret_v1beta_secrets_post(&request).await)
-                .await?;
-
-        to_json_value(response)
+        map_generated_json(self.inner.create_secret_v1beta_secrets_post(&request).await).await
     }
 
     #[instrument(name = "cli.api.list_secrets", skip_all, err)]
     pub async fn list_secrets(&self) -> Result<Value, ApiError> {
-        let response =
-            map_generated_result(self.inner.list_user_secrets_v1beta_secrets_get().await).await?;
-
-        to_json_value(response)
+        map_generated_json(self.inner.list_user_secrets_v1beta_secrets_get().await).await
     }
 
     #[instrument(name = "cli.api.delete_secret", skip_all, fields(id), err)]
     pub async fn delete_secret(&self, id: &str) -> Result<Value, ApiError> {
-        let response = map_generated_result(
+        map_generated_json(
             self.inner
                 .delete_user_secret_v1beta_secrets_id_delete(id)
                 .await,
         )
-        .await?;
-
-        to_json_value(response)
+        .await
     }
 
     #[instrument(name = "cli.api.generate_totp", skip_all, fields(id), err)]
     pub async fn generate_totp(&self, id: &str) -> Result<Value, ApiError> {
-        let response = map_generated_result(
+        map_generated_json(
             self.inner
                 .generate_totp_code_v1beta_secrets_id_totp_post(id)
                 .await,
         )
-        .await?;
-
-        to_json_value(response)
+        .await
     }
 
     fn http_client_with_timeout(&self, timeout_seconds: u64) -> Result<reqwest::Client, ApiError> {
@@ -619,9 +599,44 @@ where
     E: Serialize,
 {
     match result {
-        Ok(response) => Ok(response.into_inner()),
-        Err(error) => Err(map_generated_error(error).await),
+        Ok(response) => {
+            let _ = take_captured_response_json();
+            Ok(response.into_inner())
+        }
+        Err(error) => {
+            let _ = take_captured_response_json();
+            Err(map_generated_error(error).await)
+        }
     }
+}
+
+/// Like [`map_generated_result`], but returns the raw response JSON so object
+/// key order matches the backend instead of the generated struct field order.
+async fn map_generated_json<T, E>(
+    result: Result<generated::ResponseValue<T>, generated::Error<E>>,
+) -> Result<Value, ApiError>
+where
+    T: Serialize,
+    E: Serialize,
+{
+    match result {
+        Ok(response) => {
+            if let Some(value) = take_captured_response_json() {
+                Ok(value)
+            } else {
+                to_json_value(response.into_inner())
+            }
+        }
+        Err(error) => {
+            let _ = take_captured_response_json();
+            Err(map_generated_error(error).await)
+        }
+    }
+}
+
+fn parse_json_value(bytes: &[u8]) -> Result<Value, ApiError> {
+    serde_json::from_slice(bytes)
+        .map_err(|error| ApiError::Serialization(format!("invalid response payload: {error}")))
 }
 
 async fn map_generated_error<E: Serialize>(error: generated::Error<E>) -> ApiError {
@@ -853,6 +868,77 @@ mod tests {
         assert_eq!(
             serde_json::to_value(&run.result).expect("result should serialize"),
             json!({"ok": true})
+        );
+    }
+
+    #[test]
+    fn run_nested_maps_preserve_json_key_order() {
+        let run: generated::types::Run = serde_json::from_str(
+            r#"{
+                "status": "success",
+                "has_logs": true,
+                "id": "run_0345GkDvQ2e7hQlOxQEp9x",
+                "result": {"ok": true, "amenities": []},
+                "connector_id": "conn_03439sp4kVIQkCJy0pMhlG",
+                "arguments": {"listing_id": "1", "adults": 2},
+                "error": null,
+                "secret_bindings": {},
+                "created_at": "2026-08-11T11:27:44.888045Z",
+                "finished_at": "2026-08-11T11:27:47.039121Z"
+            }"#,
+        )
+        .expect("run should parse");
+
+        let encoded = serde_json::to_value(&run).expect("run should serialize");
+        assert_eq!(
+            encoded["arguments"]
+                .as_object()
+                .expect("arguments")
+                .keys()
+                .cloned()
+                .collect::<Vec<_>>(),
+            ["listing_id", "adults"]
+        );
+        assert_eq!(
+            encoded["result"]
+                .as_object()
+                .expect("result")
+                .keys()
+                .cloned()
+                .collect::<Vec<_>>(),
+            ["ok", "amenities"]
+        );
+    }
+
+    #[test]
+    fn captured_response_json_keeps_backend_key_order() {
+        let raw = r#"{
+            "id": "run_1",
+            "connector_id": "conn_1",
+            "arguments": {"listing_id": "1", "adults": 2},
+            "status": "success"
+        }"#;
+        super::capture_response_json(serde_json::from_str(raw).expect("valid json"));
+        let value = super::take_captured_response_json().expect("captured json");
+        let keys = value
+            .as_object()
+            .expect("object")
+            .keys()
+            .cloned()
+            .collect::<Vec<_>>();
+        assert_eq!(
+            keys,
+            ["id", "connector_id", "arguments", "status"],
+            "{keys:?}"
+        );
+        assert_eq!(
+            value["arguments"]
+                .as_object()
+                .expect("arguments")
+                .keys()
+                .cloned()
+                .collect::<Vec<_>>(),
+            ["listing_id", "adults"]
         );
     }
 
