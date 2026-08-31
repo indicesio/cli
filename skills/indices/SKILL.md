@@ -95,7 +95,9 @@ indices files download <file-id>
 
 ## Output
 
-Commands emit pretty-printed JSON. Do not pass `--output` or `--format`. `--json` is accepted for compatibility but is a no-op.
+API commands (`connectors`, `runs`, `files`, `captures`, `secrets`) emit pretty-printed JSON. Do not pass `--output` or `--format`. `--json` is accepted for compatibility but is a no-op.
+
+`login`, `logout`, `whoami`, and `update` print human-readable status instead of JSON.
 
 ## Global Flags
 
