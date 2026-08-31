@@ -82,7 +82,7 @@ indices secrets totp <secret-id>
 indices secrets delete <secret-id>
 ```
 
-API commands emit pretty-printed JSON. `login`, `logout`, `whoami`, and `update` print human-readable status.
+Commands print JSON.
 
 Create methods support:
 - Argument mode by default (for example, `--connector-id`, `--arguments`)
