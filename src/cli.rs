@@ -57,15 +57,6 @@ pub struct Cli {
     #[arg(
         long,
         global = true,
-        default_value_t = false,
-        help = "Emit JSON instead of markdown",
-        help_heading = "Global Options"
-    )]
-    pub json: bool,
-
-    #[arg(
-        long,
-        global = true,
         help = "Override API base URL",
         help_heading = "Global Options"
     )]
@@ -511,14 +502,6 @@ mod tests {
         Cli, Command, ConnectorsCommand, LoginArgs, RunIdArgs, RunsCommand, SecretsCommand,
         UpdateArgs,
     };
-
-    #[test]
-    fn parses_json_flag_as_global_option() {
-        let cli = Cli::parse_from(["indices", "--json", "connectors", "list"]);
-
-        assert!(cli.json);
-        assert!(matches!(cli.command, Command::Connectors { .. }));
-    }
 
     #[test]
     fn parses_runs_logs_command() {

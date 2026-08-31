@@ -437,7 +437,6 @@ mod tests {
     #[test]
     fn build_context_marks_login_route() {
         let cli = Cli {
-            json: false,
             api_base: None,
             timeout: None,
             command: Command::Login(LoginArgs {
