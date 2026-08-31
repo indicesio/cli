@@ -103,7 +103,7 @@ struct UpdateOutput {
 }
 
 #[instrument(name = "cli.update", skip_all, err)]
-pub async fn run(args: &UpdateArgs, timeout_seconds: u64, json: bool) -> Result<(), CliError> {
+pub async fn run(args: &UpdateArgs, timeout_seconds: u64) -> Result<(), CliError> {
     let current_version = Version::current()?;
     let install_path = current_install_path()?;
     let client = http_client(timeout_seconds)?;
@@ -115,17 +115,13 @@ pub async fn run(args: &UpdateArgs, timeout_seconds: u64, json: bool) -> Result<
         || (args.version.is_none() && current_version > target_version);
 
     if args.check || up_to_date {
-        return print_output(
-            UpdateOutput {
-                current_version: current_version.to_string(),
-                target_version: target_version.to_string(),
-                up_to_date,
-                updated: false,
-                path: install_path.display().to_string(),
-            },
-            args.check,
-            json,
-        );
+        return print_output(UpdateOutput {
+            current_version: current_version.to_string(),
+            target_version: target_version.to_string(),
+            up_to_date,
+            updated: false,
+            path: install_path.display().to_string(),
+        });
     }
 
     if is_development_binary(&install_path) {
@@ -139,59 +135,18 @@ pub async fn run(args: &UpdateArgs, timeout_seconds: u64, json: bool) -> Result<
     let bytes = download_release_binary(&client, target_version, &platform).await?;
     replace_executable(&install_path, &bytes)?;
 
-    print_output(
-        UpdateOutput {
-            current_version: current_version.to_string(),
-            target_version: target_version.to_string(),
-            up_to_date: false,
-            updated: true,
-            path: install_path.display().to_string(),
-        },
-        false,
-        json,
-    )
+    print_output(UpdateOutput {
+        current_version: current_version.to_string(),
+        target_version: target_version.to_string(),
+        up_to_date: false,
+        updated: true,
+        path: install_path.display().to_string(),
+    })
 }
 
-fn print_output(output: UpdateOutput, check: bool, json: bool) -> Result<(), CliError> {
-    if json {
-        println!("{}", serde_json::to_string_pretty(&output)?);
-        return Ok(());
-    }
-
-    print_human(&output, check);
+fn print_output(output: UpdateOutput) -> Result<(), CliError> {
+    println!("{}", serde_json::to_string_pretty(&output)?);
     Ok(())
-}
-
-fn print_human(output: &UpdateOutput, check: bool) {
-    const GREEN: &str = "\x1b[32m";
-    const CYAN: &str = "\x1b[36m";
-    const GREY: &str = "\x1b[90m";
-    const RESET: &str = "\x1b[0m";
-
-    if output.updated {
-        println!(
-            "{GREEN}✔{RESET} Updated Indices CLI from {} to {}",
-            output.current_version, output.target_version
-        );
-        println!("{GREY}Installed to {CYAN}{}{RESET}", output.path);
-        return;
-    }
-
-    if output.up_to_date {
-        println!(
-            "{GREEN}✔{RESET} Indices CLI is already up to date ({})",
-            output.current_version
-        );
-        return;
-    }
-
-    if check {
-        println!(
-            "Update available: {} → {}",
-            output.current_version, output.target_version
-        );
-        println!("{GREY}Run {CYAN}indices update{GREY} to install it{RESET}");
-    }
 }
 
 fn parse_version_part(part: Option<&str>, original: &str) -> Result<u64, CliError> {
