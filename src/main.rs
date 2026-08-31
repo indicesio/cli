@@ -1,6 +1,7 @@
 mod analytics;
 mod cli;
 mod client;
+mod color;
 mod commands;
 mod config;
 mod errors;
@@ -60,6 +61,7 @@ async fn run_inner() -> Result<(), CliError> {
     }
 
     let cli = Cli::try_parse_from(argv.clone())?;
+    color::init(cli.color);
     let analytics = Analytics::new().await;
     let mut telemetry = analytics.build_context(&cli, &argv);
 

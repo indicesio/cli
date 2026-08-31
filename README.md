@@ -82,7 +82,7 @@ indices secrets totp <secret-id>
 indices secrets delete <secret-id>
 ```
 
-Commands print JSON.
+Commands print pretty-printed JSON. Color highlighting is applied when stdout is a terminal, and is disabled for agents, pipes, `NO_COLOR`, and `--color never`.
 
 Create methods support:
 - Argument mode by default (for example, `--connector-id`, `--arguments`)

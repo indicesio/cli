@@ -439,6 +439,7 @@ mod tests {
         let cli = Cli {
             api_base: None,
             timeout: None,
+            color: crate::color::ColorChoice::Auto,
             command: Command::Login(LoginArgs {
                 api_key: None,
                 no_verify: false,

@@ -155,23 +155,25 @@ fn print_output(output: UpdateOutput, check: bool) -> Result<(), CliError> {
 }
 
 fn print_human(output: &UpdateOutput, check: bool) {
-    const GREEN: &str = "\x1b[32m";
-    const CYAN: &str = "\x1b[36m";
-    const GREY: &str = "\x1b[90m";
-    const RESET: &str = "\x1b[0m";
+    let crate::color::StatusAnsi {
+        green,
+        cyan,
+        grey,
+        reset,
+    } = crate::color::status_ansi();
 
     if output.updated {
         println!(
-            "{GREEN}✔{RESET} Updated Indices CLI from {} to {}",
+            "{green}✔{reset} Updated Indices CLI from {} to {}",
             output.current_version, output.target_version
         );
-        println!("{GREY}Installed to {CYAN}{}{RESET}", output.path);
+        println!("{grey}Installed to {cyan}{}{reset}", output.path);
         return;
     }
 
     if output.up_to_date {
         println!(
-            "{GREEN}✔{RESET} Indices CLI is already up to date ({})",
+            "{green}✔{reset} Indices CLI is already up to date ({})",
             output.current_version
         );
         return;
@@ -182,7 +184,7 @@ fn print_human(output: &UpdateOutput, check: bool) {
             "Update available: {} → {}",
             output.current_version, output.target_version
         );
-        println!("{GREY}Run {CYAN}indices update{GREY} to install it{RESET}");
+        println!("{grey}Run {cyan}indices update{grey} to install it{reset}");
     }
 }
 

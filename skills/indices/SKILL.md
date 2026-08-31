@@ -93,7 +93,7 @@ indices files download <file-id>
 
 ---
 
-Commands print JSON.
+Commands print JSON. Color highlighting is TTY-only and is disabled when an agent is detected (`CURSOR_AGENT`, `CLAUDECODE`, `CI`, …), when `NO_COLOR` is set, or when `--color never` is passed.
 
 ## Global Flags
 
@@ -102,6 +102,7 @@ Available on every command:
 | Flag | Default | Description |
 |---|---|---|
 | `--timeout <seconds>` | `30` | Request timeout. Sync `runs create` automatically extends this to `--max-timeout-s` plus a buffer. |
+| `--color <when>` | `auto` | Color output: `auto`, `always`/`on`, `never`/`off`. |
 
 When exact flags matter, verify them with `indices <command> --help`.
 

@@ -1,23 +1,27 @@
 use serde_json::Value;
 
+use crate::color::{self, StatusAnsi};
 use crate::commands::auth::WhoamiOutput;
 use crate::errors::CliError;
 
 pub fn print_response(value: &Value) -> Result<(), CliError> {
-    println!("{}", serde_json::to_string_pretty(value)?);
+    let pretty = serde_json::to_string_pretty(value)?;
+    println!("{}", color::colorize_pretty_json(&pretty));
     Ok(())
 }
 
 pub fn print_whoami(output: &WhoamiOutput) -> Result<(), CliError> {
-    print!("{}", format_whoami(output));
+    print!("{}", format_whoami(output, color::should_colorize()));
     Ok(())
 }
 
-fn format_whoami(output: &WhoamiOutput) -> String {
-    const GREEN: &str = "\x1b[32m";
-    const CYAN: &str = "\x1b[36m";
-    const GREY: &str = "\x1b[90m";
-    const RESET: &str = "\x1b[0m";
+fn format_whoami(output: &WhoamiOutput, color: bool) -> String {
+    let StatusAnsi {
+        green,
+        cyan,
+        grey,
+        reset,
+    } = StatusAnsi::for_enabled(color);
 
     let rows = [
         ("Email", output.email.as_str()),
@@ -26,12 +30,12 @@ fn format_whoami(output: &WhoamiOutput) -> String {
     let width = rows.iter().map(|(label, _)| label.len()).max().unwrap_or(0);
 
     let mut rendered = String::new();
-    rendered.push_str(&format!("{GREEN}✔{RESET} You are logged in to Indices\n"));
+    rendered.push_str(&format!("{green}✔{reset} You are logged in to Indices\n"));
     for (label, value) in rows {
         rendered.push_str(&format!("{label:<width$}  {value}\n", width = width));
     }
     rendered.push_str(&format!(
-        "{GREY}Run {CYAN}indices logout{GREY} to log out{RESET}\n"
+        "{grey}Run {cyan}indices logout{grey} to log out{reset}\n"
     ));
     rendered
 }
@@ -83,15 +87,35 @@ mod tests {
 
     #[test]
     fn whoami_renders_human_status() {
-        let rendered = format_whoami(&WhoamiOutput {
-            user_id: "user_123".to_string(),
-            email: "user@example.com".to_string(),
-        });
+        let rendered = format_whoami(
+            &WhoamiOutput {
+                user_id: "user_123".to_string(),
+                email: "user@example.com".to_string(),
+            },
+            false,
+        );
 
         assert!(rendered.contains("You are logged in to Indices"));
         assert!(rendered.contains("user@example.com"));
         assert!(rendered.contains("user_123"));
         assert!(!rendered.contains('{'));
         assert!(!rendered.contains('}'));
+        assert!(!rendered.contains('\u{1b}'));
+    }
+
+    #[test]
+    fn whoami_color_is_gated() {
+        let output = WhoamiOutput {
+            user_id: "user_123".to_string(),
+            email: "user@example.com".to_string(),
+        };
+
+        let colored = format_whoami(&output, true);
+        assert!(colored.contains("\x1b[32m✔\x1b[0m"));
+        assert!(colored.contains("\x1b[36mindices logout\x1b[90m"));
+
+        let plain = format_whoami(&output, false);
+        assert!(plain.contains("✔ You are logged in to Indices"));
+        assert!(!plain.contains('\u{1b}'));
     }
 }

@@ -41,6 +41,9 @@ tracing-subscriber = { version = "0.3", features = ["registry"] }
 uuid = { version = "1", features = ["serde"] }
 zip = { version = "8", default-features = false, features = ["deflate"] }
 
+[target.'cfg(windows)'.dependencies]
+anstyle-query = "1.1"
+
 [build-dependencies]
 openapiv3 = "2.2"
 prettyplease = "0.2"

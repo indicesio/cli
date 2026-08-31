@@ -4,6 +4,8 @@ use clap::builder::Styles;
 use clap::builder::styling::{AnsiColor, Effects};
 use clap::{Args, Parser, Subcommand};
 
+use crate::color::ColorChoice;
+
 const RUNS_CREATE_AFTER_HELP: &str = "\
 \x1b[1;97mModes:\x1b[0m
 Parameters can be supplied in one of three different ways:
@@ -69,6 +71,17 @@ pub struct Cli {
         help_heading = "Global Options"
     )]
     pub timeout: Option<u64>,
+
+    #[arg(
+        long,
+        global = true,
+        value_enum,
+        default_value_t = ColorChoice::Auto,
+        value_name = "WHEN",
+        help = "When to color output: auto, always/on, never/off",
+        help_heading = "Global Options"
+    )]
+    pub color: ColorChoice,
 
     #[command(subcommand)]
     pub command: Command,
@@ -502,6 +515,7 @@ mod tests {
         Cli, Command, ConnectorsCommand, LoginArgs, RunIdArgs, RunsCommand, SecretsCommand,
         UpdateArgs,
     };
+    use crate::color::ColorChoice;
 
     #[test]
     fn parses_runs_logs_command() {
@@ -602,5 +616,23 @@ mod tests {
                 command: SecretsCommand::Totp(ref args)
             } if args.id == "sec_123"
         ));
+    }
+
+    #[test]
+    fn color_defaults_to_auto_and_accepts_aliases() {
+        let cli = Cli::parse_from(["indices", "whoami"]);
+        assert_eq!(cli.color, ColorChoice::Auto);
+
+        let cli = Cli::parse_from(["indices", "--color", "never", "whoami"]);
+        assert_eq!(cli.color, ColorChoice::Never);
+
+        let cli = Cli::parse_from(["indices", "whoami", "--color", "off"]);
+        assert_eq!(cli.color, ColorChoice::Never);
+
+        let cli = Cli::parse_from(["indices", "--color", "on", "whoami"]);
+        assert_eq!(cli.color, ColorChoice::Always);
+
+        let cli = Cli::parse_from(["indices", "whoami", "--color", "always"]);
+        assert_eq!(cli.color, ColorChoice::Always);
     }
 }
