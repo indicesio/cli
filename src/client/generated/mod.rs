@@ -13,13 +13,4 @@ impl ClientHooks<()> for Client {
         crate::telemetry::inject_trace_context(request.headers_mut());
         Ok(())
     }
-
-    async fn exec(
-        &self,
-        request: reqwest::Request,
-        _info: &OperationInfo,
-    ) -> reqwest::Result<reqwest::Response> {
-        let response = self.client().execute(request).await?;
-        crate::client::replay_json_response(response).await
-    }
 }

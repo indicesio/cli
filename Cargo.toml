@@ -1,6 +1,6 @@
 [package]
 name = "indices-cli"
-version = "0.3.0"
+version = "0.2.6"
 edition = "2024"
 license = "MIT"
 homepage = "https://indices.io"
@@ -16,7 +16,6 @@ chrono = { version = "0.4", features = ["serde"] }
 clap = { version = "4.5", features = ["derive"] }
 directories = "5"
 flate2 = "1"
-http = "1"
 opentelemetry = "0.31"
 opentelemetry-appender-tracing = "0.31"
 opentelemetry-otlp = { version = "0.31", default-features = false, features = ["trace", "logs", "http-proto", "reqwest-blocking-client", "reqwest-rustls"] }
