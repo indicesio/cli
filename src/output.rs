@@ -1,199 +1,47 @@
-use serde_json::{Map, Value};
+use serde_json::Value;
 
 use crate::commands::auth::WhoamiOutput;
-use crate::config::OutputMode;
 use crate::errors::CliError;
 
-pub fn print_response(value: &Value, mode: OutputMode) -> Result<(), CliError> {
-    match mode {
-        OutputMode::Json => {
-            println!("{}", serde_json::to_string_pretty(value)?);
-        }
-        OutputMode::Markdown => print_markdown(value),
-    }
-
+pub fn print_response(value: &Value) -> Result<(), CliError> {
+    println!("{}", serde_json::to_string_pretty(value)?);
     Ok(())
 }
 
-pub fn print_whoami(output: &WhoamiOutput, mode: OutputMode) -> Result<(), CliError> {
-    match mode {
-        OutputMode::Json => {
-            println!("{}", serde_json::to_string_pretty(output)?);
-        }
-        OutputMode::Markdown => print_whoami_pretty(output),
-    }
-
+pub fn print_whoami(output: &WhoamiOutput) -> Result<(), CliError> {
+    print!("{}", format_whoami(output));
     Ok(())
 }
 
-fn print_markdown(value: &Value) {
-    match value {
-        Value::Array(items) => print_markdown_array(items),
-        Value::Object(map) => {
-            if let Some(Value::Array(items)) = map.get("data") {
-                print_markdown_array(items);
-                print_markdown_metadata(map, "data");
-            } else {
-                print_markdown_object(map);
-            }
-        }
-        _ => println!("- `{}`", markdown_inline_code(&stringify_value(value))),
-    }
-}
-
-fn print_markdown_metadata(map: &Map<String, Value>, skip_key: &str) {
-    let fields = map
-        .iter()
-        .filter(|(key, _)| key.as_str() != skip_key)
-        .collect::<Vec<_>>();
-
-    if !fields.is_empty() {
-        println!("\n## Metadata");
-        for (key, value) in fields {
-            print_markdown_field(key, value);
-        }
-    }
-}
-
-fn print_markdown_array(items: &[Value]) {
-    if items.is_empty() {
-        println!("_No results._");
-        return;
-    }
-
-    if items.iter().all(Value::is_object) {
-        for (index, item) in items.iter().enumerate() {
-            let object = item
-                .as_object()
-                .expect("checked object shape before markdown object rendering");
-            println!("## {}", markdown_item_title(index, object));
-            print_markdown_object(object);
-            if index + 1 != items.len() {
-                println!();
-            }
-        }
-        return;
-    }
-
-    for item in items {
-        println!("- `{}`", markdown_inline_code(&stringify_value(item)));
-    }
-}
-
-fn markdown_item_title(index: usize, object: &Map<String, Value>) -> String {
-    let marker = object
-        .get("id")
-        .or_else(|| object.get("uuid"))
-        .and_then(Value::as_str)
-        .unwrap_or("");
-
-    if marker.is_empty() {
-        format!("Item {}", index + 1)
-    } else {
-        format!("Item {} ({marker})", index + 1)
-    }
-}
-
-fn print_markdown_object(map: &Map<String, Value>) {
-    if map.is_empty() {
-        println!("_No fields._");
-        return;
-    }
-
-    for (key, value) in map {
-        print_markdown_field(key, value);
-    }
-}
-
-fn print_markdown_field(key: &str, value: &Value) {
-    match value {
-        Value::Array(_) | Value::Object(_) => {
-            println!("- `{key}`:");
-            print_json_block(value);
-        }
-        Value::String(raw) => {
-            if let Some(parsed) = parse_json_like_string(raw) {
-                println!("- `{key}`:");
-                print_json_block(&parsed);
-            } else if raw.contains('\n') {
-                println!("- `{key}`:");
-                println!("```text");
-                println!("{}", raw.trim_end());
-                println!("```");
-            } else {
-                println!("- `{key}`: `{}`", markdown_inline_code(raw));
-            }
-        }
-        _ => {
-            println!(
-                "- `{key}`: `{}`",
-                markdown_inline_code(&stringify_value(value))
-            );
-        }
-    }
-}
-
-fn print_json_block(value: &Value) {
-    println!("```json");
-    println!(
-        "{}",
-        serde_json::to_string_pretty(value).unwrap_or_else(|_| stringify_value(value))
-    );
-    println!("```");
-}
-
-fn parse_json_like_string(raw: &str) -> Option<Value> {
-    let trimmed = raw.trim();
-    if !((trimmed.starts_with('{') && trimmed.ends_with('}'))
-        || (trimmed.starts_with('[') && trimmed.ends_with(']')))
-    {
-        return None;
-    }
-
-    serde_json::from_str(trimmed).ok()
-}
-
-fn markdown_inline_code(value: &str) -> String {
-    value
-        .replace('`', "'")
-        .replace('\r', "")
-        .replace('\n', "\\n")
-}
-
-fn stringify_value(value: &Value) -> String {
-    match value {
-        Value::Null => "null".to_string(),
-        Value::Bool(v) => v.to_string(),
-        Value::Number(v) => v.to_string(),
-        Value::String(v) => v.to_string(),
-        Value::Array(_) | Value::Object(_) => serde_json::to_string(value).unwrap_or_default(),
-    }
-}
-
-fn print_whoami_pretty(output: &WhoamiOutput) {
+fn format_whoami(output: &WhoamiOutput) -> String {
     const GREEN: &str = "\x1b[32m";
     const CYAN: &str = "\x1b[36m";
     const GREY: &str = "\x1b[90m";
     const RESET: &str = "\x1b[0m";
 
-    println!("{GREEN}✔{RESET} You are logged in to Indices");
-
-    let rows = vec![
-        ("Email", output.email.clone()),
-        ("User ID", output.user_id.clone()),
+    let rows = [
+        ("Email", output.email.as_str()),
+        ("User ID", output.user_id.as_str()),
     ];
-
     let width = rows.iter().map(|(label, _)| label.len()).max().unwrap_or(0);
-    for (label, value) in rows {
-        println!("{label:<width$}  {value}", width = width);
-    }
 
-    println!("{GREY}Run {CYAN}indices logout{GREY} to log out{RESET}");
+    let mut rendered = String::new();
+    rendered.push_str(&format!("{GREEN}✔{RESET} You are logged in to Indices\n"));
+    for (label, value) in rows {
+        rendered.push_str(&format!("{label:<width$}  {value}\n", width = width));
+    }
+    rendered.push_str(&format!(
+        "{GREY}Run {CYAN}indices logout{GREY} to log out{RESET}\n"
+    ));
+    rendered
 }
 
 #[cfg(test)]
 mod tests {
     use serde_json::Value;
+
+    use super::format_whoami;
+    use crate::commands::auth::WhoamiOutput;
 
     fn object_keys(value: &Value) -> Vec<String> {
         value.as_object().expect("object").keys().cloned().collect()
@@ -231,5 +79,19 @@ mod tests {
         assert!(arguments < listing_id);
         assert!(listing_id < adults);
         assert!(adults < status);
+    }
+
+    #[test]
+    fn whoami_renders_human_status() {
+        let rendered = format_whoami(&WhoamiOutput {
+            user_id: "user_123".to_string(),
+            email: "user@example.com".to_string(),
+        });
+
+        assert!(rendered.contains("You are logged in to Indices"));
+        assert!(rendered.contains("user@example.com"));
+        assert!(rendered.contains("user_123"));
+        assert!(!rendered.contains('{'));
+        assert!(!rendered.contains('}'));
     }
 }

@@ -93,16 +93,15 @@ indices files download <file-id>
 
 ---
 
+Commands print JSON.
+
 ## Global Flags
 
 Available on every command:
 
 | Flag | Default | Description |
 |---|---|---|
-| `--json` | off | Emit JSON instead of Markdown (for scripting) |
 | `--timeout <seconds>` | `30` | Request timeout. Sync `runs create` automatically extends this to `--max-timeout-s` plus a buffer. |
-
-Never use `--output json`; this CLI uses the global `--json` flag instead.
 
 When exact flags matter, verify them with `indices <command> --help`.
 

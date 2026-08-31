@@ -16,7 +16,7 @@ use crate::analytics::Analytics;
 use crate::cli::{Cli, Command};
 use crate::client::{ApiClient, ClientOptions};
 use crate::commands::auth::WhoamiOutput;
-use crate::config::{ConfigStore, OutputMode, RuntimeConfig, RuntimeOverrides, StoredSession};
+use crate::config::{ConfigStore, RuntimeConfig, RuntimeOverrides, StoredSession};
 use crate::errors::{CliError, record_cli_outcome};
 
 enum CommandResponse {
@@ -118,7 +118,7 @@ async fn execute_command_inner(
         Command::Update(args) => {
             let runtime = config_store.resolve_runtime(overrides)?;
             analytics.capture_command_start(telemetry).await;
-            commands::update::run(args, runtime.timeout_seconds, cli.json).await?;
+            commands::update::run(args, runtime.timeout_seconds).await?;
             Ok(())
         }
         _ => {
@@ -150,14 +150,9 @@ async fn execute_command_inner(
                 Err(e) => return Err(e),
             };
 
-            let output_mode = if cli.json {
-                OutputMode::Json
-            } else {
-                OutputMode::Markdown
-            };
             match response {
-                CommandResponse::Value(value) => output::print_response(&value, output_mode)?,
-                CommandResponse::Whoami(output) => output::print_whoami(&output, output_mode)?,
+                CommandResponse::Value(value) => output::print_response(&value)?,
+                CommandResponse::Whoami(output) => output::print_whoami(&output)?,
             }
             Ok(())
         }

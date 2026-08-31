@@ -4,7 +4,6 @@ use std::io::{Cursor, Read};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use serde::Serialize;
 use sha2::{Digest, Sha256};
 use tracing::instrument;
 
@@ -93,7 +92,7 @@ impl Platform {
     }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug)]
 struct UpdateOutput {
     current_version: String,
     target_version: String,
@@ -103,7 +102,7 @@ struct UpdateOutput {
 }
 
 #[instrument(name = "cli.update", skip_all, err)]
-pub async fn run(args: &UpdateArgs, timeout_seconds: u64, json: bool) -> Result<(), CliError> {
+pub async fn run(args: &UpdateArgs, timeout_seconds: u64) -> Result<(), CliError> {
     let current_version = Version::current()?;
     let install_path = current_install_path()?;
     let client = http_client(timeout_seconds)?;
@@ -124,7 +123,6 @@ pub async fn run(args: &UpdateArgs, timeout_seconds: u64, json: bool) -> Result<
                 path: install_path.display().to_string(),
             },
             args.check,
-            json,
         );
     }
 
@@ -148,16 +146,10 @@ pub async fn run(args: &UpdateArgs, timeout_seconds: u64, json: bool) -> Result<
             path: install_path.display().to_string(),
         },
         false,
-        json,
     )
 }
 
-fn print_output(output: UpdateOutput, check: bool, json: bool) -> Result<(), CliError> {
-    if json {
-        println!("{}", serde_json::to_string_pretty(&output)?);
-        return Ok(());
-    }
-
+fn print_output(output: UpdateOutput, check: bool) -> Result<(), CliError> {
     print_human(&output, check);
     Ok(())
 }
