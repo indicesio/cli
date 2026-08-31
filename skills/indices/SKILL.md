@@ -181,7 +181,7 @@ indices runs get <run-id>
 indices runs logs <run-id>
 ```
 
-On `connector_error`, `error` has the machine-readable type (`auth_required`, `invalid_input`, `site_unavailable`, `site_changed`, `internal_error`, `crash`, or `unhandled`), message, and optional details. Successful and other platform-status runs have `error: null`. When `has_logs` is true, call `indices runs logs`. Files produced by a run are listed with `indices files list --run-id <run-id>`.
+On `success`, `result` is a JSON object matching the connector's `output_schema`; otherwise `result` is null. On `connector_error`, `error` is a `RunError` with the machine-readable type (`auth_required`, `invalid_input`, `site_unavailable`, `site_changed`, `internal_error`, `crash`, or `unhandled`), message, and optional details. Successful and other platform-status runs have `error: null`. When `has_logs` is true, call `indices runs logs`. Files produced by a run are listed with `indices files list --run-id <run-id>`.
 
 ---
 
