@@ -4,32 +4,6 @@ use crate::commands::auth::WhoamiOutput;
 use crate::config::OutputMode;
 use crate::errors::CliError;
 
-const PRIORITY_KEYS: &[&str] = &[
-    "id",
-    "uuid",
-    "name",
-    "display_name",
-    "connector_id",
-    "file_id",
-    "run_id",
-    "purpose",
-    "website",
-    "current_state",
-    "state",
-    "status",
-    "error",
-    "result",
-    "source",
-    "success",
-    "has_logs",
-    "iframe_url",
-    "stdout",
-    "stderr",
-    "created_at",
-    "finished_at",
-    "updated_at",
-];
-
 pub fn print_response(value: &Value, mode: OutputMode) -> Result<(), CliError> {
     match mode {
         OutputMode::Json => {
@@ -68,17 +42,15 @@ fn print_markdown(value: &Value) {
 }
 
 fn print_markdown_metadata(map: &Map<String, Value>, skip_key: &str) {
-    let keys = ordered_keys(map)
-        .into_iter()
-        .filter(|key| key.as_str() != skip_key)
+    let fields = map
+        .iter()
+        .filter(|(key, _)| key.as_str() != skip_key)
         .collect::<Vec<_>>();
 
-    if !keys.is_empty() {
+    if !fields.is_empty() {
         println!("\n## Metadata");
-        for key in keys {
-            if let Some(value) = map.get(&key) {
-                print_markdown_field(&key, value);
-            }
+        for (key, value) in fields {
+            print_markdown_field(key, value);
         }
     }
 }
@@ -128,36 +100,9 @@ fn print_markdown_object(map: &Map<String, Value>) {
         return;
     }
 
-    for key in ordered_keys(map) {
-        if let Some(value) = map.get(&key) {
-            print_markdown_field(&key, value);
-        }
+    for (key, value) in map {
+        print_markdown_field(key, value);
     }
-}
-
-fn ordered_keys(map: &Map<String, Value>) -> Vec<String> {
-    let mut keys = map.keys().cloned().collect::<Vec<_>>();
-    keys.sort_by_key(|key| {
-        PRIORITY_KEYS
-            .iter()
-            .position(|priority| priority == key)
-            .unwrap_or(usize::MAX)
-    });
-
-    // Keep non-priority keys deterministic by alphabetical order.
-    let mut non_priority = keys
-        .iter()
-        .filter(|key| !PRIORITY_KEYS.contains(&key.as_str()))
-        .cloned()
-        .collect::<Vec<_>>();
-    non_priority.sort();
-
-    let priority = keys
-        .into_iter()
-        .filter(|key| PRIORITY_KEYS.contains(&key.as_str()))
-        .collect::<Vec<_>>();
-
-    priority.into_iter().chain(non_priority).collect()
 }
 
 fn print_markdown_field(key: &str, value: &Value) {
@@ -248,26 +193,43 @@ fn print_whoami_pretty(output: &WhoamiOutput) {
 
 #[cfg(test)]
 mod tests {
-    use serde_json::json;
+    use serde_json::Value;
 
-    use super::ordered_keys;
+    fn object_keys(value: &Value) -> Vec<String> {
+        value.as_object().expect("object").keys().cloned().collect()
+    }
 
     #[test]
-    fn run_error_renders_after_status() {
-        let value = json!({
-            "id": "run_1",
-            "status": "success",
-            "error": null,
-            "result": {}
-        });
-        let keys = ordered_keys(value.as_object().expect("object"));
+    fn pretty_json_preserves_backend_key_order() {
+        let value: Value = serde_json::from_str(
+            r#"{
+                "id": "run_1",
+                "connector_id": "conn_1",
+                "arguments": {"listing_id": "1", "adults": 2},
+                "status": "success",
+                "error": null
+            }"#,
+        )
+        .expect("valid json");
+
         assert_eq!(
-            keys.iter().position(|k| k == "status").unwrap() + 1,
-            keys.iter().position(|k| k == "error").unwrap()
+            object_keys(&value),
+            ["id", "connector_id", "arguments", "status", "error"]
         );
-        assert_eq!(
-            keys.iter().position(|k| k == "error").unwrap() + 1,
-            keys.iter().position(|k| k == "result").unwrap()
-        );
+        assert_eq!(object_keys(&value["arguments"]), ["listing_id", "adults"]);
+
+        let pretty = serde_json::to_string_pretty(&value).expect("pretty json");
+        let id = pretty.find("\"id\"").expect("id");
+        let connector_id = pretty.find("\"connector_id\"").expect("connector_id");
+        let arguments = pretty.find("\"arguments\"").expect("arguments");
+        let listing_id = pretty.find("\"listing_id\"").expect("listing_id");
+        let adults = pretty.find("\"adults\"").expect("adults");
+        let status = pretty.find("\"status\"").expect("status");
+
+        assert!(id < connector_id);
+        assert!(connector_id < arguments);
+        assert!(arguments < listing_id);
+        assert!(listing_id < adults);
+        assert!(adults < status);
     }
 }
