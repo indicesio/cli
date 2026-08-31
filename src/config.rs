@@ -12,14 +12,6 @@ pub const DEFAULT_API_BASE: &str = "https://api.indices.io";
 const DEFAULT_TIMEOUT_SECONDS: u64 = 30;
 const CONFIG_FILE_NAME: &str = "config.toml";
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
-#[serde(rename_all = "lowercase")]
-pub enum OutputMode {
-    #[default]
-    Markdown,
-    Json,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConfigFile {
     pub api_base: Option<String>,

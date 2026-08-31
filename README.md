@@ -82,7 +82,7 @@ indices secrets totp <secret-id>
 indices secrets delete <secret-id>
 ```
 
-Commands render Markdown by default. Use `--json` on any command for JSON output.
+Commands emit pretty-printed JSON.
 
 Create methods support:
 - Argument mode by default (for example, `--connector-id`, `--arguments`)

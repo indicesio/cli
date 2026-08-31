@@ -54,13 +54,9 @@ fn cli_styles() -> Styles {
 #[command(name = "indices")]
 #[command(about = "Indices API CLI", long_about = None, styles = cli_styles())]
 pub struct Cli {
-    #[arg(
-        long,
-        global = true,
-        default_value_t = false,
-        help = "Emit JSON instead of markdown",
-        help_heading = "Global Options"
-    )]
+    /// Deprecated no-op. Command output is always JSON. Kept so existing `--json`
+    /// invocations still parse.
+    #[arg(long, global = true, hide = true, default_value_t = false)]
     pub json: bool,
 
     #[arg(
@@ -513,11 +509,24 @@ mod tests {
     };
 
     #[test]
-    fn parses_json_flag_as_global_option() {
+    fn accepts_deprecated_json_flag_as_global_option() {
         let cli = Cli::parse_from(["indices", "--json", "connectors", "list"]);
 
         assert!(cli.json);
         assert!(matches!(cli.command, Command::Connectors { .. }));
+    }
+
+    #[test]
+    fn help_does_not_advertise_json_or_markdown_output_flags() {
+        use clap::CommandFactory;
+
+        let mut command = Cli::command();
+        let mut help = Vec::new();
+        command.write_help(&mut help).expect("help should render");
+        let help = String::from_utf8(help).expect("help should be utf-8");
+
+        assert!(!help.contains("--json"));
+        assert!(!help.to_lowercase().contains("markdown"));
     }
 
     #[test]
