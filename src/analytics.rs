@@ -14,8 +14,8 @@ use crate::cli::{
 };
 use crate::config::StoredSession;
 
-const POSTHOG_API_KEY: &str = "phc_jVpGaCd1oWZEsWxv5KHfmNacUjOp5VT4yhNJAnpBiok";
-const POSTHOG_HOST: &str = "https://eu.i.posthog.com";
+const POSTHOG_API_KEY: &str = "phc_vEMQanJDLjopZ6ZHdzXUqu3nt8xkQvo4VSBnXpt6cR2u";
+const POSTHOG_HOST: &str = "https://us.i.posthog.com";
 const TELEMETRY_DISABLED_ENV: &str = "INDICES_TELEMETRY_DISABLED";
 
 /// Context included in every event
