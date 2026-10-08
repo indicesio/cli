@@ -469,12 +469,7 @@ impl ApiClient {
     }
 
     #[instrument(name = "cli.api.create_string_secret", skip_all, fields(name), err)]
-    pub async fn create_string_secret(
-        &self,
-        name: &str,
-        value: &str,
-        website: Option<&str>,
-    ) -> Result<Value, ApiError> {
+    pub async fn create_string_secret(&self, name: &str, value: &str) -> Result<Value, ApiError> {
         let request = generated::types::CreateSecretRequest {
             name: name.to_string(),
             password: None,
@@ -482,7 +477,6 @@ impl ApiClient {
             totp_secret: None,
             username: None,
             value: Some(value.to_string()),
-            website: website.map(ToOwned::to_owned),
         };
 
         self.create_secret_request(request).await
@@ -495,7 +489,6 @@ impl ApiClient {
         username: &str,
         password: &str,
         totp_secret: Option<&str>,
-        website: Option<&str>,
     ) -> Result<Value, ApiError> {
         let request = generated::types::CreateSecretRequest {
             name: name.to_string(),
@@ -504,7 +497,6 @@ impl ApiClient {
             totp_secret: totp_secret.map(ToOwned::to_owned),
             username: Some(username.to_string()),
             value: None,
-            website: website.map(ToOwned::to_owned),
         };
 
         self.create_secret_request(request).await
@@ -845,6 +837,7 @@ mod tests {
         let raw = json!({
             "id": "run_0345GkDvQ2e7hQlOxQEp9x",
             "connector_id": "conn_03439sp4kVIQkCJy0pMhlG",
+            "connector_version": 1,
             "arguments": {
                 "adults": 2,
                 "listing_id": "1161267476226972345"
@@ -852,6 +845,8 @@ mod tests {
             "secret_bindings": {},
             "status": "success",
             "result": {"ok": true},
+            "result_stored": true,
+            "result_size_bytes": 11,
             "error": null,
             "has_logs": true,
             "created_at": "2026-08-11T11:27:44.888045Z",
@@ -876,7 +871,10 @@ mod tests {
                 "has_logs": true,
                 "id": "run_0345GkDvQ2e7hQlOxQEp9x",
                 "result": {"ok": true, "amenities": []},
+                "result_stored": true,
+                "result_size_bytes": 26,
                 "connector_id": "conn_03439sp4kVIQkCJy0pMhlG",
+                "connector_version": 1,
                 "arguments": {"listing_id": "1", "adults": 2},
                 "error": null,
                 "secret_bindings": {},
@@ -912,10 +910,13 @@ mod tests {
         let raw = json!({
             "id": "run_errorExample00000000001",
             "connector_id": "conn_03439sp4kVIQkCJy0pMhlG",
+            "connector_version": 1,
             "arguments": {},
             "secret_bindings": {},
             "status": "connector_error",
             "result": null,
+            "result_stored": false,
+            "result_size_bytes": null,
             "error": {
                 "type": "site_changed",
                 "message": "listing page layout changed",
@@ -948,10 +949,13 @@ mod tests {
                 {
                     "id": "run_0345GkDvQ2e7hQlOxQEp9x",
                     "connector_id": "conn_03439sp4kVIQkCJy0pMhlG",
+                    "connector_version": 1,
                     "arguments": {},
                     "secret_bindings": {},
                     "status": "success",
                     "result": {},
+                    "result_stored": true,
+                    "result_size_bytes": 2,
                     "error": null,
                     "has_logs": false,
                     "created_at": "2026-08-11T11:27:44.888045Z",

@@ -32,9 +32,7 @@ async fn create_secret(client: &ApiClient, args: &CreateSecretArgs) -> Result<Va
                     "secret value cannot be empty".to_string(),
                 ));
             }
-            Ok(client
-                .create_string_secret(&args.name, &value, args.website.as_deref())
-                .await?)
+            Ok(client.create_string_secret(&args.name, &value).await?)
         }
         "login" => {
             let username = args.username.clone().ok_or_else(|| {
@@ -52,7 +50,6 @@ async fn create_secret(client: &ApiClient, args: &CreateSecretArgs) -> Result<Va
                     &username,
                     &password,
                     args.totp_secret.as_deref(),
-                    args.website.as_deref(),
                 )
                 .await?)
         }
@@ -142,7 +139,6 @@ mod tests {
             username: None,
             password: None,
             totp_secret: None,
-            website: None,
             stdin: false,
         }
     }

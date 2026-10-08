@@ -470,9 +470,6 @@ pub struct CreateSecretArgs {
     #[arg(long, help = "Optional TOTP secret, base32 encoded (login type)")]
     pub totp_secret: Option<String>,
 
-    #[arg(long, help = "Optional website URL for context")]
-    pub website: Option<String>,
-
     #[arg(
         long,
         default_value_t = false,
